@@ -82,7 +82,7 @@ class Regression(pl.LightningModule):
 dm = MyDataModule(dataset_dict)
 model = Regression('distilbert-base-uncased')
 trainer = pl.Trainer(
-    accelerator='gpu',
+    accelerator='cpu',
     devices=1,
     max_epochs=100
 )
