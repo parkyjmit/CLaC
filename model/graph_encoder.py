@@ -1,5 +1,7 @@
 import torch_geometric
 from transformers import AutoModel
+from torch import nn
+from torch_geometric import nn as gnn
 
 
 def load_graph_encoder(cfg):
@@ -8,17 +10,19 @@ def load_graph_encoder(cfg):
     elif cfg.model_name == 'gcn':
         return GCNEncoder(cfg)
     elif cfg.model_name == 'graphormer':
-        return GraphormerEncoder(cfg)
+        return AutoModel.from_pretrained(cfg.model_link)
     else:
         raise NotImplementedError
     
-def GATEncoder(cfg):
+class GATEncoder(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.model = gnn.GATConv(
+            in_channels=cfg.in_channels,
+            out_channels=cfg.out_channels,
+            heads=cfg.heads,
+            dropout=cfg.dropout
+        )
+
+class GCNEncoder(nn.Module):
     pass
-
-def GCNEncoder(cfg):
-    pass
-
-def GraphormerEncoder(cfg):
-    model = AutoModel.from_pretrained(cfg.model_link)
-    return model
-

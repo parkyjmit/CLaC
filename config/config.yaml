@@ -7,5 +7,6 @@ hyperparams:
   progress_bar_refresh_rate: 16
   gpus: 16
 defaults:
-  - graph_encoder: graphormer
-  - text_encoder: distilbert
+  - clamp_type: 
+    - graph_encoder: graphormer
+    - text_encoder: distilbert
