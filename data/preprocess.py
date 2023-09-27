@@ -10,16 +10,138 @@ from jarvis.analysis.structure.spacegroup import Spacegroup3D
 # from mendeleev import element
 
 import pandas as pd
+import numpy as np
 from transformers.models.graphormer.collating_graphormer import preprocess_item, GraphormerDataCollator
 from atoms2graph import AtomsToGraphs
 import json
-from pandarallel import pandarallel # import pandarallel
+from pandarallel import pandarallel 
+from joblib import Parallel, delayed
 from tqdm import tqdm
 
 tqdm.pandas()
 pandarallel.initialize(progress_bar=True) # initialize pandarallel
 
 # dataset_processed = dataset.map(preprocess_item, batched=False)
+
+periodic_table = {'H': 'Hydrogen',
+                'He': 'Helium',
+                'Li': 'Lithium',
+                'Be': 'Beryllium',
+                'B': 'Boron',
+                'C': 'Carbon',
+                'N': 'Nitrogen',
+                'O': 'Oxygen',
+                'F': 'Fluorine',
+                'Ne': 'Neon',
+                'Na': 'Sodium',
+                'Mg': 'Magnesium',
+                'Al': 'Aluminum',
+                'Si': 'Silicon',
+                'P': 'Phosphorus',
+                'S': 'Sulfur',
+                'Cl': 'Chlorine',
+                'Ar': 'Argon',
+                'K': 'Potassium',
+                'Ca': 'Calcium',
+                'Sc': 'Scandium',
+                'Ti': 'Titanium',
+                'V': 'Vanadium',
+                'Cr': 'Chromium',
+                'Mn': 'Manganese',
+                'Fe': 'Iron',
+                'Co': 'Cobalt',
+                'Ni': 'Nickel',
+                'Cu': 'Copper',
+                'Zn': 'Zinc',
+                'Ga': 'Gallium',
+                'Ge': 'Germanium',
+                'As': 'Arsenic',
+                'Se': 'Selenium',
+                'Br': 'Bromine',
+                'Kr': 'Krypton',
+                'Rb': 'Rubidium',
+                'Sr': 'Strontium',
+                'Y': 'Yttrium',
+                'Zr': 'Zirconium',
+                'Nb': 'Niobium',
+                'Mo': 'Molybdenum',
+                'Tc': 'Technetium',
+                'Ru': 'Ruthenium',
+                'Rh': 'Rhodium',
+                'Pd': 'Palladium',
+                'Ag': 'Silver',
+                'Cd': 'Cadmium',
+                'In': 'Indium',
+                'Sn': 'Tin',
+                'Sb': 'Antimony',
+                'Te': 'Tellurium',
+                'I': 'Iodine',
+                'Xe': 'Xenon',
+                'Cs': 'Cesium',
+                'Ba': 'Barium',
+                'La': 'Lanthanum',
+                'Ce': 'Cerium',
+                'Pr': 'Praseodymium',
+                'Nd': 'Neodymium',
+                'Pm': 'Promethium',
+                'Sm': 'Samarium',
+                'Eu': 'Europium',
+                'Gd': 'Gadolinium',
+                'Tb': 'Terbium',
+                'Dy': 'Dysprosium',
+                'Ho': 'Holmium',
+                'Er': 'Erbium',
+                'Tm': 'Thulium',
+                'Yb': 'Ytterbium',
+                'Lu': 'Lutetium',
+                'Hf': 'Hafnium',
+                'Ta': 'Tantalum',
+                'W': 'Tungsten',
+                'Re': 'Rhenium',
+                'Os': 'Osmium',
+                'Ir': 'Iridium',
+                'Pt': 'Platinum',
+                'Au': 'Gold',
+                'Hg': 'Mercury',
+                'Tl': 'Thallium',
+                'Pb': 'Lead',
+                'Bi': 'Bismuth',
+                'Po': 'Polonium',
+                'At': 'Astatine',
+                'Rn': 'Radon',
+                'Fr': 'Francium',
+                'Ra': 'Radium',
+                'Ac': 'Actinium',
+                'Th': 'Thorium',
+                'Pa': 'Protactinium',
+                'U': 'Uranium',
+                'Np': 'Neptunium',
+                'Pu': 'Plutonium',
+                'Am': 'Americium',
+                'Cm': 'Curium',
+                'Bk': 'Berkelium',
+                'Cf': 'Californium',
+                'Es': 'Einsteinium',
+                'Fm': 'Fermium',
+                'Md': 'Mendelevium',
+                'No': 'Nobelium',
+                'Lr': 'Lawrencium',
+                'Rf': 'Rutherfordium',
+                'Db': 'Dubnium',
+                'Sg': 'Seaborgium',
+                'Bh': 'Bohrium',
+                'Hs': 'Hassium',
+                'Mt': 'Meitnerium',
+                'Ds': 'Darmstadtium',
+                'Rg': 'Roentgenium',
+                'Cn': 'Copernicium',
+                'Nh': 'Nihonium',
+                'Fl': 'Flerovium',
+                'Mc': 'Moscovium',
+                'Lv': 'Livermorium',
+                'Ts': 'Tennessine',
+                'Og': 'Oganesson'}
+
 
 def count_elements(lst):
     '''
@@ -40,7 +162,7 @@ def print_element_counts(element_counts):
     '''
     text = 'The unit cell consists of '
     for elem, count in element_counts.items():
-        text += f'{count} {element(elem).name} atoms, '
+        text += f'{count} {periodic_table[elem]}, '
     text = text[:-2] + '.'
     return text
 
@@ -67,12 +189,25 @@ class JarvisToJson:
         )
     
     def convert(self, db_name):
-        self.data = pd.DataFrame(jdata(db_name))
-        self.data['temp'] = self.data['atoms'].parallel_apply(self.generate_graph_and_text)
-        temp = self.data['temp'].to_list()
+        '''
+        Convert figshare data to json
+        '''
+        # open figshare data and convert to text and graph
+        data = pd.DataFrame(jdata(db_name))
+        # split series using np
+        data = np.array_split(data, 12)
+
+        results = Parallel(n_jobs=12)(delayed(self.treat_chunk)(chunk) for chunk in tqdm(data))
+        results = pd.concat(results)
+        results = results.to_list()
+        # save to json
         with open(f'{db_name}_data.json', 'w') as f:
-            json.dump(temp, f)
-        return temp
+            json.dump(results, f)
+        return results
+    
+    def treat_chunk(self, chunk):
+        result = chunk['atoms'].apply(self.generate_graph_and_text)
+        return result
 
     def generate_graph_and_text(self, atoms):
         '''
@@ -82,7 +217,7 @@ class JarvisToJson:
         '''
         jatoms = Atoms.from_dict(atoms)
         # Generate graph
-        dglgraph = Graph.atom_dgl_multigraph(jatoms, compute_line_graph=False)
+        dglgraph = Graph.atom_dgl_multigraph(jatoms, compute_line_graph=False, atom_features='atomic_number')
         item = {}
         edges = dglgraph.edges()
         item['edge_index'] = [edges[0].tolist(), edges[1].tolist()]
@@ -93,20 +228,17 @@ class JarvisToJson:
         # Generate text
         formula = jatoms.composition.reduced_formula
         crystalsystem = Spacegroup3D(jatoms).crystal_system
-        # count_elems_text = print_element_counts(count_elements(jatoms.elements))
+        count_elems_text = print_element_counts(count_elements(jatoms.elements))
 
-        item['y'] = f'A POSCAR of the {crystalsystem} {formula}. '
+        item['y'] = f'A POSCAR of the {crystalsystem} {formula}. \n{count_elems_text} And it has {crystalsystem} structure.'
         return item
     
 
 def main():
-    dbs = ['oqmd_3d', 'aflow2', 'cod']
+    dbs = ['dft_2d','aflow2', 'cod']
     converter = JarvisToJson()
-    total = []
     for db in dbs:
-        total += converter.convert(db)
-    with open('all_data.json', 'w') as f:
-        json.dump(total, f)
+        converter.convert(db)
 
 
 if __name__ == '__main__':
