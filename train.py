@@ -36,5 +36,6 @@ def main(cfg: CLaMPConfigs):
     # Testing
     trainer.test(model, datamodule=dm)
 
+
 if __name__ == '__main__':
     main()

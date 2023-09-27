@@ -6,12 +6,43 @@ jarvis figshare data에서 graph-text pair를 여기서 만들어서 json으로 
 from jarvis.db.figshare import data as jdata
 from jarvis.core.graphs import Graph
 from jarvis.core.atoms import Atoms
+from jarvis.analysis.structure.spacegroup import Spacegroup3D
+# from mendeleev import element
+
 import pandas as pd
 from transformers.models.graphormer.collating_graphormer import preprocess_item, GraphormerDataCollator
 from atoms2graph import AtomsToGraphs
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+import json
+from pandarallel import pandarallel # import pandarallel
+from tqdm import tqdm
+
+tqdm.pandas()
+pandarallel.initialize(progress_bar=True) # initialize pandarallel
 
 # dataset_processed = dataset.map(preprocess_item, batched=False)
+
+def count_elements(lst):
+    '''
+    Count elements in a list    
+    '''
+    element_count = {}
+    for elem in lst:
+        if elem in element_count:
+            element_count[elem] += 1
+        else:
+            element_count[elem] = 1
+    return element_count
+
+
+def print_element_counts(element_counts):
+    '''
+    Return a string of elem counts
+    '''
+    text = 'The unit cell consists of '
+    for elem, count in element_counts.items():
+        text += f'{count} {element(elem).name} atoms, '
+    text = text[:-2] + '.'
+    return text
 
 
 class JarvisToJson:
@@ -37,10 +68,11 @@ class JarvisToJson:
     
     def convert(self, db_name):
         self.data = pd.DataFrame(jdata(db_name))
-        self.data['temp'] = self.data['atoms'].apply(self.generate_graph_and_text)
+        self.data['temp'] = self.data['atoms'].parallel_apply(self.generate_graph_and_text)
         temp = self.data['temp'].to_list()
-        with open(f'{db_name}.json', 'w') as f:
+        with open(f'{db_name}_data.json', 'w') as f:
             json.dump(temp, f)
+        return temp
 
     def generate_graph_and_text(self, atoms):
         '''
@@ -60,17 +92,21 @@ class JarvisToJson:
         
         # Generate text
         formula = jatoms.composition.reduced_formula
-        crystalsystem = SpacegroupAnalyzer(jatoms.pymatgen_converter()).get_crystal_system()
-        
-        item['y'] = f'A POSCAR of {crystalsystem} {formula}'
+        crystalsystem = Spacegroup3D(jatoms).crystal_system
+        # count_elems_text = print_element_counts(count_elements(jatoms.elements))
+
+        item['y'] = f'A POSCAR of the {crystalsystem} {formula}. '
         return item
     
 
 def main():
-    dbs = ['mp_3d_2020', 'oqmd_3d', 'aflow2', 'cod']
+    dbs = ['oqmd_3d', 'aflow2', 'cod']
     converter = JarvisToJson()
+    total = []
     for db in dbs:
-        converter.convert(db)
+        total += converter.convert(db)
+    with open('all_data.json', 'w') as f:
+        json.dump(total, f)
 
 
 if __name__ == '__main__':
