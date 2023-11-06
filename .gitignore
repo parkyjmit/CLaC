@@ -1,6 +1,5 @@
 lightning_logs
 __pycache__
-*.ipynb
 *_data.json
 liquid_electrolytes.txt
 jsons
@@ -9,3 +8,5 @@ jsons
 wandb
 outputs
 logs
+data/preprocess.ipynb
+*.ipynb
