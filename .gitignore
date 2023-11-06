@@ -9,4 +9,4 @@ wandb
 outputs
 logs
 data/preprocess.ipynb
-*.ipynb
+# *.ipynb
