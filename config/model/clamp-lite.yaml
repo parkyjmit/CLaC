@@ -1,0 +1,18 @@
+_target_: model.clamp.CLaMPLite
+datamodule:
+  _target_: data.datamodule.CLaMPDataModule
+  data_path: ${paths.data}
+  batch_size: ${hyperparams.batch_size}
+  num_workers: ${hyperparams.num_workers}
+  tokenizer_model: ${llm}
+  debug: ${debug}
+
+augmentation: True
+
+emb_dim: ${hyperparams.emb_dim}
+defaults:
+  - graph_encoder: cgcnn
+  - optimizer: adamw
+  - scheduler: cosinewarm
+  - graph_augmentation: perturb_structure
+  - text_augmentation: token_random_masking

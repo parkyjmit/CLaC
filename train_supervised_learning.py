@@ -16,6 +16,7 @@ from pytorch_lightning.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
 )
+from model.clamp import GraphSupervisedLearning
 
 import os
 os.environ['HYDRA_FULL_ERROR'] = '1'
@@ -88,17 +89,11 @@ def main(cfg: DictConfig):
     dm.setup()
 
     # Model loading
-    if hasattr(dm, 'task'):
-        if dm.task == 'classification':
-            cfg.model.num_classes = len(dm.categories)
-        else:
-            cfg.model.num_classes = 1
+    task = dm.task
+    if task == 'classification':
+        
+    model = GraphSupervisedLearning(cfg.model)
     model = hydra.utils.instantiate(cfg.model, _recursive_=False)
-    if hasattr(dm, 'task'):
-        model.task = dm.task
-        if dm.task == 'classification':
-            model.label_encoder = dm.label_encoder
-            model.categories = dm.categories
 
     # Logger instantiation/configuration
     wandb_logger = None

@@ -12,14 +12,14 @@ from jarvis.analysis.structure.spacegroup import Spacegroup3D
 import pandas as pd
 import numpy as np
 from transformers.models.graphormer.collating_graphormer import preprocess_item, GraphormerDataCollator
-# from atoms2graph import AtomsToGraphs
+from atoms2graph import AtomsToGraphs
 import json
 from pandarallel import pandarallel 
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-# tqdm.pandas()
-# pandarallel.initialize(progress_bar=True) # initialize pandarallel
+tqdm.pandas()
+pandarallel.initialize(progress_bar=True) # initialize pandarallel
 
 # dataset_processed = dataset.map(preprocess_item, batched=False)
 
@@ -204,10 +204,10 @@ class JarvisToJson:
         results = results.to_list()
         # save to json
         if split >= 0:
-            with open(f'{db_name}_{split+1}_data.json', 'w') as f:
+            with open(f'{db_name}_{split+1}_cif_data.json', 'w') as f:
                 json.dump(results, f)
         else:
-            with open(f'{db_name}_data.json', 'w') as f:
+            with open(f'{db_name}_cif_data.json', 'w') as f:
                 json.dump(results, f)
         return results
     
@@ -215,40 +215,25 @@ class JarvisToJson:
         result = []
         for atom in chunk['atoms']:
             try:
-                result.append(self.generate_graph_and_text(atom))
+                result.append(self.generate_cif_and_text(atom))
             except:
                 pass
         result = pd.Series(result)
         return result
 
-    def generate_graph_and_text(self, atoms):
+    def generate_cif_and_text(self, atoms):
         '''
         Generate graph and text for a single atomic structure
             atoms: dict
             items: dict
         '''
         jatoms = Atoms.from_dict(atoms)
-        # Generate graph
-        dglgraph = Graph.atom_dgl_multigraph(jatoms, compute_line_graph=False, atom_features='atomic_number')
-        item = {}
-        edges = dglgraph.edges()
-        item['edge_index'] = [edges[0].tolist(), edges[1].tolist()]
-        item['num_nodes'] = dglgraph.num_nodes()
-        item['node_feat'] = dglgraph.ndata['atom_features'].tolist()
-        item['edge_attr'] = dglgraph.edata['r'].tolist()
-        item['atoms'] = atoms
-        
-        # Generate text
-        formula = jatoms.composition.reduced_formula
-        crystalsystem = Spacegroup3D(jatoms).crystal_system
-        count_elems_text = print_element_counts(count_elements(jatoms.elements))
-
-        item['y'] = f'A POSCAR of the {crystalsystem} {formula}. \n{count_elems_text} And it has {crystalsystem} structure.'
+        item = jatoms.generate_cif_stiring()
         return item
     
 
 def main():
-    dbs = ['dft_3d']
+    dbs = ['oqmd_3d']
     split = 3
     converter = JarvisToJson()
     for db in dbs:

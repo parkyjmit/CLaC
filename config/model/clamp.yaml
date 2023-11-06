@@ -1,0 +1,12 @@
+data_module:
+  - data_path: ${data_path}
+
+graph_augmentation: 
+  - graph_augmentation: column_replace
+text_augmentation:
+  - text_augmentation: token_random_masking
+
+default:
+  - graph_encoder: 
+  - text_encoder:
+  - data_module: clamp_datamodule

@@ -1,0 +1,8 @@
+_target_: model.graph_encoder.CGCNN
+orig_atom_fea_len: 92
+nbr_fea_len: 80
+atom_fea_len: 512
+n_conv: 3
+h_fea_len: 128
+n_h: 1
+out_dim: 512

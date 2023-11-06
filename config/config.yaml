@@ -1,12 +1,16 @@
+exp_name: semiconductor
+debug: False
 paths:
   log: /var/log/yourapp.log
-  data: /var/lib/yourapp/data
+  data: /home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_materials_graphs_gpt_questions  # mp_3d_2020_materials_graphs_gpt_questions, mp_3d_2020_cif_papers, mp_3d_2020_merged
 hyperparams: 
-  batch_size: 16
-  max_epochs: 16
-  progress_bar_refresh_rate: 16
-  gpus: 16
+  emb_dim: 256
+  batch_size: 256  # 16
+  num_workers: 6
+
+llm: allenai/scibert_scivocab_cased #distilbert-base-uncased #bert-base-cased #allenai/scibert_scivocab_cased
 defaults:
-  - clamp_type: 
-    - graph_encoder: graphormer
-    - text_encoder: distilbert
+  - logging: default
+  - model: supervised
+  - trainer: default
+

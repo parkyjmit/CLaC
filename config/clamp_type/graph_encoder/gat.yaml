@@ -1,7 +1,0 @@
-model_name: gat
-num_layers: int
-hidden_dim: int
-dropout: float
-num_classes: int
-num_heads: int
-encoding_type: str

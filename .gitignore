@@ -2,3 +2,10 @@ lightning_logs
 __pycache__
 *.ipynb
 *_data.json
+liquid_electrolytes.txt
+jsons
+*.json
+*.parquet
+wandb
+outputs
+logs

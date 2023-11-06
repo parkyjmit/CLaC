@@ -1,8 +1,13 @@
 '''
-train, val, test split여기서
-미리 edge_index 등 그래프 구성도 여기서
-jarvis figshare data에서 graph-text pair를 여기서 만들어서 json으로 저장
+From JARVIS figshare data, generate cif files and find paragraphs in materials science papers
+generate_cif: if True, generate cif files from JARVIS figshare data
+find_paragraphs: if True, find paragraphs in materials science papers
 '''
+from tqdm import tqdm
+import pyarrow.parquet as pq
+import pandas as pd
+import numpy as np
+import json
 from jarvis.db.figshare import data as jdata
 from jarvis.core.graphs import Graph
 from jarvis.core.atoms import Atoms
@@ -12,16 +17,13 @@ from jarvis.analysis.structure.spacegroup import Spacegroup3D
 import pandas as pd
 import numpy as np
 from transformers.models.graphormer.collating_graphormer import preprocess_item, GraphormerDataCollator
-# from atoms2graph import AtomsToGraphs
+from atoms2graph import AtomsToGraphs
 import json
 from pandarallel import pandarallel 
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-# tqdm.pandas()
-# pandarallel.initialize(progress_bar=True) # initialize pandarallel
 
-# dataset_processed = dataset.map(preprocess_item, batched=False)
 
 periodic_table = {'H': 'Hydrogen',
                 'He': 'Helium',
@@ -142,118 +144,97 @@ periodic_table = {'H': 'Hydrogen',
                 'Ts': 'Tennessine',
                 'Og': 'Oganesson'}
 
+def search_paper_paragraphs(df, mat):
+    # First check if the formula is in the text
+    df['query'] = df['text'].apply(lambda x: mat in x)
+    true_rows = df[df['query']]
+    selected_rows = true_rows if len(true_rows) <= 2 else true_rows.sample(n=2) # max 2
+    text_series = selected_rows['text'].apply(lambda x: [p for p in x.split('\n') if mat in p][:2]).to_list()  # list of paragraph including keyword
+    doi_series = selected_rows['doi'].to_list()
+    return text_series, doi_series
 
-def count_elements(lst):
-    '''
-    Count elements in a list    
-    '''
-    element_count = {}
-    for elem in lst:
-        if elem in element_count:
-            element_count[elem] += 1
-        else:
-            element_count[elem] = 1
-    return element_count
-
-
-def print_element_counts(element_counts):
-    '''
-    Return a string of elem counts
-    '''
-    text = 'The unit cell consists of '
-    for elem, count in element_counts.items():
-        text += f'{count} {periodic_table[elem]}, '
-    text = text[:-2] + '.'
-    return text
-
-
-class JarvisToJson:
-    def __init__(self,
-                 max_neigh: int = 12,
-                 radius: int = 8,
-                 r_energy: bool = False,
-                 r_forces: bool = False,
-                 r_distances: bool = False,
-                 r_edges: bool = True,
-                 r_fixed: bool = True,
-                 r_pbc: bool = False):
-        self.a2g = AtomsToGraphs(
-            max_neigh=max_neigh,
-            radius=radius,
-            r_energy=r_energy,
-            r_forces=r_forces,
-            r_distances=r_distances,
-            r_edges=r_edges,
-            r_fixed=r_fixed,
-            r_pbc=r_pbc
-        )
-    
-    def convert(self, db_name, split):
-        '''
-        Convert figshare data to json
-        '''
-        # open figshare data and convert to text and graph
-        data = pd.DataFrame(jdata(db_name))
-        if split >= 0:
-            data = np.array_split(data, 4)[split]
-        # split series using np
-        data = np.array_split(data, 12)
-
-        results = Parallel(n_jobs=12)(delayed(self.treat_chunk)(chunk) for chunk in tqdm(data))
-        results = pd.concat(results)
-        results = results.to_list()
-        # save to json
-        if split >= 0:
-            with open(f'{db_name}_{split+1}_data.json', 'w') as f:
-                json.dump(results, f)
-        else:
-            with open(f'{db_name}_data.json', 'w') as f:
-                json.dump(results, f)
-        return results
-    
-    def treat_chunk(self, chunk):
+def cif_generate_chunk(chunk):
         result = []
-        for atom in chunk['atoms']:
+        for atom in tqdm(chunk['atoms']):
             try:
-                result.append(self.generate_graph_and_text(atom))
-            except:
-                pass
-        result = pd.Series(result)
+                jatoms = Atoms.from_dict(atom)
+                item = jatoms.generate_cif_string()
+                item['atoms'] = atom
+                result.append(item)
+            except: pass
         return result
 
-    def generate_graph_and_text(self, atoms):
-        '''
-        Generate graph and text for a single atomic structure
-            atoms: dict
-            items: dict
-        '''
-        jatoms = Atoms.from_dict(atoms)
-        # Generate graph
-        dglgraph = Graph.atom_dgl_multigraph(jatoms, compute_line_graph=False, atom_features='atomic_number')
-        item = {}
-        edges = dglgraph.edges()
-        item['edge_index'] = [edges[0].tolist(), edges[1].tolist()]
-        item['num_nodes'] = dglgraph.num_nodes()
-        item['node_feat'] = dglgraph.ndata['atom_features'].tolist()
-        item['edge_attr'] = dglgraph.edata['r'].tolist()
-        item['atoms'] = atoms
+
+def main(args):
+    # Load all materials db and deduplicate
+    if args['generate_cif']:
+        dbs = args['db_name']
+        atoms_volumes = []
+        for db in dbs:
+            db = pd.DataFrame(jdata(db))
+            db_split = np.array_split(db, 4)
+            for i in range(4):
+                chunks = db_split[i]
+                chunks = np.array_split(chunks, 12)
+                results = Parallel(n_jobs=12)(delayed(cif_generate_chunk)(chunk) for chunk in chunks)
+                results =  sum(results, [])
+                atoms_volumes += results    
+        atoms_volumes = pd.DataFrame(atoms_volumes)
+        # atoms_volumes['drop_key'] = atoms_volumes['reduced_formula'] + atoms_volumes['crystal system'] + atoms_volumes['spg']
+        # atoms_volumes = atoms_volumes.sort_values('volume').drop_duplicates(subset=['drop_key'], keep='first')
+        # atoms_volumes = atoms_volumes.drop(columns=['drop_key'])
+        # Save as parquet
+        atoms_volumes.to_parquet(args['output']+'.parquet')
+        del db
+
+    if args['find_paragraphs']:
+        atoms_volumes = pd.read_parquet(args['output']+'.parquet')  # load file contarining cif data
+        chunks = np.array_split(atoms_volumes, 12)
+
+        def search_paragraphs_chunk(chunk):
+            '''
+            search paragraphs from materials database chunk
+            '''
+            get_result = []
+            for mat in tqdm(chunk.iloc):
+                query = mat['reduced_formula']
+                if len(query) <= 2:
+                    if len(query) == 1:
+                        query = periodic_table[query]
+                    else:
+                        if query[1].islower():
+                            query = periodic_table[query]
+                        else:
+                            query = query
+                result = search_paper_paragraphs(df, mat['reduced_formula'])
+                mat['paragraphs'] = result[0]
+                mat['doi'] = result[1]
+                mat['num_papers'] = len(result[1])
+                if mat['num_papers'] > 0:
+                    get_result.append(mat)
+            return get_result
+
+        # Repeat for materials science papers 10 times
+        for i in range(10):
+            # Load paper data
+            df = pq.read_table(f'/mnt/hdd1/SESPapers/multi-label/materials_paper_split_{i}.parquet')
+            df = df.to_pandas()
+            results = Parallel(n_jobs=12)(delayed(search_paragraphs_chunk)(chunk) for chunk in chunks)
+            results = pd.DataFrame(sum(results, []))
+
+            # Save as parquet
+            results.to_parquet(args['output_materials']+f'_split_{i}.parquet')
+            del results
         
-        # Generate text
-        formula = jatoms.composition.reduced_formula
-        crystalsystem = Spacegroup3D(jatoms).crystal_system
-        count_elems_text = print_element_counts(count_elements(jatoms.elements))
-
-        item['y'] = f'A POSCAR of the {crystalsystem} {formula}. \n{count_elems_text} And it has {crystalsystem} structure.'
-        return item
-    
-
-def main():
-    dbs = ['dft_3d']
-    split = 3
-    converter = JarvisToJson()
-    for db in dbs:
-        converter.convert(db, split)
-
 
 if __name__ == '__main__':
-    main()
+    args = {}
+    args['generate_cif'] = False
+    args['find_paragraphs'] = True
+    args['db_name'] = ['aflow2']
+    args['materials_science_papers_1'] = '/mnt/hdd1/SESPapers/multi-label/paper_type7.parquet'
+    args['materials_science_papers_2'] = '/mnt/hdd1/SESPapers/multi-label/paper_type2.parquet'
+    args['output'] = 'aflow2_cif'
+    args['output_materials'] = 'aflow2_cif_papers'
+
+    main(args)

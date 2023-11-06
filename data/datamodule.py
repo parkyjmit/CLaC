@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Mapping
+from omegaconf import DictConfig
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader
@@ -6,81 +7,173 @@ from datasets import Dataset, DatasetDict, load_dataset
 from transformers import AutoTokenizer
 from transformers.data.data_collator import default_data_collator
 from transformers.models.graphormer.collating_graphormer import preprocess_item, GraphormerDataCollator
+from data.utils import jarvis_atoms2graph
+from torch_geometric.data import Data, Batch
 
 
 class CLaMPBaseDataModule(pl.LightningDataModule):
     def __init__(
             self, 
-            cfg,
             data_path: str, 
-            batch_size: int = 16
+            batch_size: int = 16,
+            num_workers: int = 12,
+            tokenizer_model: str = 'bert-base-uncased',
+            debug: bool = False,
+            *args,
+            **kwargs,
         ):
         super().__init__()
-        self.cfg = cfg
-        self.data_path = data_path
+        self.data_path = {
+            'train': data_path+'_train.parquet',
+            'val': data_path+'_val.parquet',
+            'test': data_path+'_test.parquet',
+        }
         self.batch_size = batch_size
-        self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.model_link)
-        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.num_workers = num_workers
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
+        self.debug = debug
+        # self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def setup(self, stage=None):
-        dataset = load_dataset('json', data_files=self.data_path)
+        dataset = load_dataset('parquet', data_files=self.data_path)
+        
+        dataset['train'] = dataset['train'].train_test_split(test_size=0.995)['train'] if self.debug else dataset['train']
+        dataset['train'] = dataset['train'].shuffle()
+        self.dataset = dataset
 
-        dataset = dataset.shuffle()
-        dataset = dataset['train'].map(self.preprocess_function, batched=False, remove_columns=['y'])
-        # split dataset
-        dataset = dataset.train_test_split(test_size=0.2)
-        train_dataset = dataset['train']
-        dataset = dataset['test']
-        dataset = dataset.train_test_split(test_size=0.5)
-        val_dataset = dataset['val']
-        test_dataset = dataset['test']
-        self.dataset = DatasetDict({
-            'train': train_dataset,
-            'val': val_dataset,
-            'test': test_dataset
-        })
-        self.dataset = dataset.set_format(type='torch', columns=['input_ids_1', 'attention_mask_1', 'input_ids_2', 'attention_mask_2'])
+        # dataset = dataset['train'].train_test_split(test_size=0.995) if self.debug else dataset
+
+        # dataset = dataset.shuffle()
+        # dataset = dataset['train']#.map(self.preprocess_function, batched=False, num_proc=self.num_workers)
+        # # split dataset
+        # dataset = dataset.train_test_split(test_size=0.2)
+        # train_dataset = dataset['train']
+        # dataset = dataset['test']
+        # dataset = dataset.train_test_split(test_size=0.5)
+        # val_dataset = dataset['train']
+        # test_dataset = dataset['test']
+        # self.dataset = DatasetDict({
+        #     'train': train_dataset,
+        #     'val': val_dataset,
+        #     'test': test_dataset
+        # })
+        # # self.dataset = dataset.set_format(type='torch', columns=['input_ids', 'attention_mask'])
  
     def train_dataloader(self):
-        return DataLoader(self.dataset['train'], batch_size=self.batch_size, collate_fn=self.collate_fn)
+        return DataLoader(self.dataset['train'], batch_size=self.batch_size, collate_fn=self.collate_fn, num_workers=self.num_workers)
 
     def val_dataloader(self):
-        return DataLoader(self.dataset['val'], batch_size=self.batch_size, collate_fn=self.collate_fn)
+        return DataLoader(self.dataset['val'], batch_size=self.batch_size, collate_fn=self.collate_fn, num_workers=self.num_workers)
 
     def test_dataloader(self):
-        return DataLoader(self.dataset['test'], batch_size=self.batch_size, collate_fn=self.collate_fn)
+        return DataLoader(self.dataset['test'], batch_size=self.batch_size, collate_fn=self.collate_fn, num_workers=self.num_workers)
     
 
 class CLaMPDataModule(CLaMPBaseDataModule):
     def __init__(
             self, 
-            cfg,
             data_path: str, 
-            batch_size: int = 16
+            batch_size: int = 16,
+            num_workers: int = 12,
+            tokenizer_model: str = 'bert-base-uncased',
+            *args,
+            **kwargs,
         ):
-        super().__init__(cfg, data_path, batch_size)
-        self.collate_fn = CLaMPDataCollator()
+        super().__init__(data_path, batch_size, num_workers, tokenizer_model, *args, **kwargs)
+        self.graph_data_collator = graph_data_collator
+        self.text_data_collator = text_data_collator
+        self.token_fn = lambda x: self.tokenizer(x, padding='max_length', truncation=True, max_length=512)
 
-    def preprocess_function(self, item, keep_features=True):
-        entities = {}
-        entities['graph'] = preprocess_item(item, keep_features)
-        encoded = self.tokenizer(item['y'], padding=True, max_length=7)
-        entities['text'] = encoded
-        return entities
-    
-
-class CLaMPDataCollator:
-    def __init__(self) -> None:
-        self.graph_data_collator = GraphormerDataCollator()
-        self.text_data_collator = default_data_collator
-
-    def __call__(self, features: List[dict]) -> Dict[str, Any]:
-        graph_batch = [f['graph'] for f in features]
-        graph_batch = self.graph_data_collator(graph_batch)
-        text_batch = [f['text'] for f in features]
-        text_batch = self.text_data_collator(text_batch)
+    def collate_fn(self, features: List[dict]) -> Dict[str, Any]:
+        graph_batch = self.graph_data_collator(features)
+        text_batch = self.text_data_collator(features, self.token_fn)
         return graph_batch, text_batch
     
+
+def graph_data_collator(features: List[dict]) -> Dict[str, Any]:
+    """
+    """
+    return Batch.from_data_list([Data(x=torch.tensor(f["node_feat"]), 
+                                      edge_index=torch.tensor(f['edge_index']), 
+                                      edge_attr=torch.tensor(f['edge_attr']),
+                                      y=torch.tensor(f['y'])) for f in features])
+
+
+def text_data_collator(features: List[dict], token_fn) -> Dict[str, Any]:
+    '''
+    '''
+    text_batch = [token_fn(f['text']) for f in features]
+    return default_data_collator(text_batch)
+
+
+class GraphSupervisedDataModule(CLaMPBaseDataModule):
+    def __init__(
+            self, 
+            data_path: str, 
+            batch_size: int = 16,
+            num_workers: int = 12,
+            tokenizer_model: str = 'bert-base-uncased',
+            label: str = 'y',
+            task: str = 'classification',
+            *args,
+            **kwargs,
+        ):
+        super().__init__(data_path, batch_size, num_workers, tokenizer_model, *args, **kwargs)
+        self.graph_data_collator = graph_data_collator
+        self.label = label
+        self.task = task
+
+    def setup(self, stage=None):
+        dataset = load_dataset('parquet', data_files=self.data_path)
+        if self.task == 'classification':
+            from sklearn.preprocessing import LabelEncoder
+            self.categories = dataset['train'].unique(self.label)
+            self.label_encoder = LabelEncoder().fit(self.categories)
+        
+        dataset['train'] = dataset['train'].train_test_split(test_size=0.995)['train'] if self.debug else dataset['train']
+        dataset['train'] = dataset['train'].shuffle()
+        self.dataset = dataset
+
+    def collate_fn(self, features: List[dict]) -> Dict[str, Any]:
+        if self.task == 'classification':
+            for f in features:
+                f['y'] = self.label_encoder.transform([f[self.label]])[0]
+        elif self.task == 'regression':
+            for f in features:
+                f['y'] = float(f[self.label])
+        graph_batch = self.graph_data_collator(features)
+        return graph_batch
+
+
+class QuestionEvaluationDataModule(CLaMPBaseDataModule):
+    def __init__(self, 
+                 data_path: str, 
+                 batch_size: int = 16, 
+                 num_workers: int = 12, 
+                 tokenizer_model: str = 'bert-base-uncased', 
+                 debug: bool = False, 
+                 label: str = 'structure_question_list',
+                 *args, 
+                 **kwargs):
+        super().__init__(data_path, batch_size, num_workers, tokenizer_model, debug, *args, **kwargs)
+        self.graph_data_collator = graph_data_collator
+        self.text_data_collator = question_batch_data_collator
+        self.label = label
+        self.token_fn = lambda x: self.tokenizer(x, padding='max_length', truncation=True, max_length=512)
+
+    def collate_fn(self, features: List[dict]) -> Dict[str, Any]:
+        graph_batch = self.graph_data_collator(features)
+        text_batch = self.text_data_collator(features, self.token_fn, self.label)
+        return graph_batch, text_batch
+    
+
+def question_batch_data_collator(features: List[dict], token_fn, label) -> Dict[str, Any]:
+    '''
+    '''
+    text_batch = [default_data_collator([token_fn(q) for q in f[label]]) for f in features]
+    # return default_data_collator(text_batch)
+    return text_batch[0]
+
 
 class DeCLaMPDataModule(CLaMPBaseDataModule):
     def __init__(

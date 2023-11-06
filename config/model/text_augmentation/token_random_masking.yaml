@@ -1,0 +1,3 @@
+_target_: data.augmentation.TokenRandomMaskingAugmentation
+mask_prob: 0.15
+mask_token: 103  # scibert mask_token_id

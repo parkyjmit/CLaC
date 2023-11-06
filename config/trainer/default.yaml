@@ -1,0 +1,26 @@
+# reproducibility
+deterministic: False
+random_seed: 42
+
+# training
+
+pl_trainer:
+  accelerator: gpu
+  devices: 4
+  strategy: ddp_find_unused_parameters_true
+  precision: bf16-mixed
+  # max_steps: 10000
+  max_epochs: 100
+  accumulate_grad_batches: 8
+  gradient_clip_val: 0.0005
+
+monitor_metric: 'val_acc'
+monitor_metric_mode: 'max'
+
+early_stopping:
+  patience: 10
+  verbose: False
+
+model_checkpoints:
+  save_top_k: 2
+  verbose: False

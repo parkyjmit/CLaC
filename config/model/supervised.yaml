@@ -1,0 +1,19 @@
+_target_: model.clamp.GraphSupervisedLearning
+datamodule:
+  _target_: data.datamodule.GraphSupervisedDataModule
+  data_path: ${paths.data}
+  batch_size: ${hyperparams.batch_size}
+  num_workers: ${hyperparams.num_workers}
+  tokenizer_model: ${llm}
+  label: is_stable
+  task: classification
+  debug: ${debug}
+
+num_classes: None
+
+augmentation: True
+
+defaults:
+  - graph_encoder: cgcnn
+  - optimizer: adamw
+  - scheduler: cosinewarm

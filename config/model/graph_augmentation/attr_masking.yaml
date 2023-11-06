@@ -1,0 +1,2 @@
+_target_: data.augmentation.GraphAttrMaskingAugmentation
+mask_prob: 0.15
