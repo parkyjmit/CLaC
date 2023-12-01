@@ -32,7 +32,7 @@ def main(cfg):
     test_dataloader = dm.test_dataloader()
 
     # Model loading
-    model = CLaMPLite.load_from_checkpoint(cfg.model_ckpt)
+    model = CLaMPLite.load_from_checkpoint(cfg.model_ckpt, map_location={'cuda:0': 'cpu'})
     model = model.to(cfg.device)
     model.eval()
     # print vram usage
@@ -51,7 +51,7 @@ def main(cfg):
 
         with torch.no_grad():
             g_feat = model.graph_encoder(graphs)  # (batch, hidden)
-            t_feat = model.text_encoder(**questions).last_hidden_state[:,0]  # (batch, hidden)
+            t_feat = model.text_encoder(input_ids=questions['input_ids'], attention_mask=questions['attention_mask']).last_hidden_state[:,-1]  # (batch, hidden)
             similarity, image_out, text_out = model.loss.global_d(g_feat, t_feat)
             # measure accuracy. the prediction is the largest similarity and the answer is always the first one
             if cfg.evaluation_method == 'zero-shot QA':
@@ -87,8 +87,8 @@ def main(cfg):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    # parser.add_argument('--data-path', type=str, default='/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_cif_papers')
     parser.add_argument('--data-path', type=str, default='/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_materials_graphs_gpt_questions')
+    # parser.add_argument('--data-path', type=str, default='/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_nuclear_questions_0')
     # parser.add_argument('--data-path', type=str, default={
     #     'train': '/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_materials_graphs_gpt_questions_train.parquet',
     #     'val': '/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_materials_graphs_gpt_questions_val.parquet',
@@ -97,11 +97,23 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=1, help='1 for QA')  # 8, 64, 128, 512
     parser.add_argument('--num-workers', type=int, default=12)
     parser.add_argument('--llm', type=str, default='allenai/scibert_scivocab_cased')
-    parser.add_argument('--debug', type=bool, default=True)
-    parser.add_argument('--label', type=str, default='oxide_question_list', choices=['text', 'composition_question_list', 'structure_question_list', 'metal_question_list', 'semiconductor_question_list', 'stable_question_list', 'oxide_question_list'])
-    parser.add_argument('--model-ckpt', type=str, default='outputs/2023-10-22/12-13-19/epoch=35-step=24768.ckpt')  # papers
+    # parser.add_argument('--llm', type=str, default='facebook/galactica-125m')
+    parser.add_argument('--debug', type=bool, default=False)
+    parser.add_argument('--label', type=str, default='structure_question_list', choices=['text', 'composition_question_list', 'structure_question_list', 'metal_question_list', 'semiconductor_question_list', 'stable_question_list', 'oxide_question_list', 'Statements'])
+    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-10-22/12-13-19/epoch=35-step=24768.ckpt')  # papers
     # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-10-21/03-47-05/epoch=9-step=1980.ckpt')  # GPT
-    parser.add_argument('--device', type=str, default='cuda:2')
+    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-11/14-27-14/epoch=39-step=27520.ckpt')  # papers-painn
+    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-10/11-27-57/epoch=39-step=15800.ckpt')  # gpt-painn
+    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-09/00-24-38/epoch=38-step=15405.ckpt')  # gpt-painn-galax
+    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-11/04-24-47/epoch=7-step=3160.ckpt')  # gpt-cgcnn-galax
+    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-02/13-51-53/epoch=38-step=34515.ckpt')  # merged
+    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-19/11-05-21/epoch=87-step=77880.ckpt')  # merged - painn
+    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-12-01/09-27-24/epoch=9-step=1980.ckpt')  # crystal only
+    parser.add_argument('--model-ckpt', type=str, default='outputs/2023-12-01/12-31-20/epoch=9-step=8850.ckpt')  # merged - painn - dlr
+    
+    
+
+    parser.add_argument('--device', type=str, default='cuda:3')
 
     parser.add_argument('--evaluation-method', type=str, default='zero-shot QA', choices=['zero-shot QA', 'zero-shot retrieval', 'few-shot QA', 'few-shot retrieval'])
 

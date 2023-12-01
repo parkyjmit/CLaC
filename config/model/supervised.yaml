@@ -5,7 +5,7 @@ datamodule:
   batch_size: ${hyperparams.batch_size}
   num_workers: ${hyperparams.num_workers}
   tokenizer_model: ${llm}
-  label: is_stable
+  label: crystal system
   task: classification
   debug: ${debug}
 
@@ -14,6 +14,6 @@ num_classes: None
 augmentation: True
 
 defaults:
-  - graph_encoder: cgcnn
+  - graph_encoder: painn
   - optimizer: adamw
   - scheduler: cosinewarm

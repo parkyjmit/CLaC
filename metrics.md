@@ -14,6 +14,47 @@ Trained in academic paper paragraphs
 - Stable questions accuracy: 0.4426943169225898
 - Oxide questions accuracy: 0.8337027069811619
 
+Trained in GPT texts - painn
+- Composition questions accuracy: 0.9943802437866076
+- Structure questions accuracy: 0.18244419819534588  # 반대로 해서 다시 해야함 
+- Metal questions accuracy: 0.3043375019787874
+- Semiconductor questions accuracy: 0.4762545512110179
+- Stable questions accuracy: 0.697799588412221  # 반대로 해서 다시해야 함
+- Oxide questions accuracy: 0.9205318980528732
+
+Trained in academic paper paragraphs - painn
+- Composition questions accuracy: 0.8947285103688459
+- Structure questions accuracy: 0.16875098939369954
+- Metal questions accuracy: 0.5917365838214342
+- Semiconductor questions accuracy: 0.5752730726610733
+- Stable questions accuracy: 0.5347475067278772
+- Oxide questions accuracy: 0.6466677220199462
+
+Trained in GPT texts - painn - galax
+- Composition questions accuracy: 0.9123001424726928
+- Structure questions accuracy: 0.20729776792781385  # 반대로 해서 다시 해야함 
+- Metal questions accuracy: 0.2574006648725661
+- Semiconductor questions accuracy: 0.5091024220357765
+- Stable questions accuracy: 0.2723602976096248 # 반대로 해서 다시해야 함
+- Oxide questions accuracy: 0.5672787715687827
+
+Trained in GPT texts - cgcnn - galax
+<!-- - Composition questions accuracy: 0.9943802437866076
+- Structure questions accuracy: 0.18244419819534588  # 반대로 해서 다시 해야함 
+- Metal questions accuracy: 0.3043375019787874
+- Semiconductor questions accuracy: 0.4762545512110179
+- Stable questions accuracy: 0.697799588412221  # 반대로 해서 다시해야 함
+- Oxide questions accuracy: 0.9205318980528732 -->
+
+Trained in merged - painn
+- Composition questions accuracy: 0.9123001424726928
+- Structure questions accuracy: 0.2056355865125851  # 반대로 해서 다시 해야함 
+- Metal questions accuracy: 0.5908659173658383
+- Semiconductor questions accuracy: 0.5721070128225424
+- Stable questions accuracy: 0.6188063954408738 # 반대로 해서 다시해야 함
+- Oxide questions accuracy: 0.5672787715687827
+
+
 G to T Retrieval
 - Trained in GPT texts
     - GPT texts
@@ -62,3 +103,9 @@ T to G Retrieval
         - Batch size 512: Top1: 0.2566699683666229, Top3: 0.5374814867973328, Top10: 0.77848219871521
         - Batch size 1024: Top1: 0.20727421343326569, Top3: 0.44021567702293396, Top10: 0.691920280456543
         - Batch size 4096: Top1: 0.11564941704273224, Top3: 0.2579101622104645, Top10: 0.4828857481479645
+
+paper-cgcnn-scibert: 
+paper-painn-scibert: 0.2
+gpt-painn-galax: 0.15384615384615385
+gpt-cgcnn-galax: 0.2
+merged-cgcnn-scibert: 0.2153846153846154

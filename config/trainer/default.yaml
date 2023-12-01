@@ -14,7 +14,7 @@ pl_trainer:
   accumulate_grad_batches: 8
   gradient_clip_val: 0.0005
 
-monitor_metric: 'val_acc'
+monitor_metric: 'val_acc_top1'  # 'val_acc_top1'
 monitor_metric_mode: 'max'
 
 early_stopping:

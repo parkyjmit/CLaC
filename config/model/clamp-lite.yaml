@@ -11,8 +11,8 @@ augmentation: True
 
 emb_dim: ${hyperparams.emb_dim}
 defaults:
-  - graph_encoder: cgcnn
+  - graph_encoder: painn
   - optimizer: adamw
   - scheduler: cosinewarm
-  - graph_augmentation: perturb_structure
+  - graph_augmentation: attr_masking # attr_masking # perturb_structure
   - text_augmentation: token_random_masking

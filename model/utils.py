@@ -5,6 +5,14 @@ from typing import Optional
 
 
 def build_mlp(in_dim, hidden_dim, fc_num_layers, out_dim, act):
+    '''
+    Build a multi-layer perceptron
+        in_dim: input dimension
+        hidden_dim: hidden dimension
+        fc_num_layers: number of hidden layers
+        out_dim: output dimension
+        act: activation function
+    '''
     mods = [nn.Linear(in_dim, hidden_dim), act]
     for i in range(fc_num_layers-1):
         mods += [nn.Linear(hidden_dim, hidden_dim), act]

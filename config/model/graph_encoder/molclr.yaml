@@ -1,0 +1,2 @@
+_target_: model.graph_encoder.MolCLR
+out_dim: 512

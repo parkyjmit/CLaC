@@ -1,3 +1,4 @@
+.env
 lightning_logs
 __pycache__
 *_data.json

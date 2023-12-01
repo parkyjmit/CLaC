@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch import nn, einsum
 import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModel, BertConfig
+from transformers import AutoTokenizer, AutoModel, AutoConfig
 from data.augmentation import GraphAttrMaskingAugmentation, GraphPerturbationAugmentation, TokenRandomMaskingAugmentation
 import random
 
@@ -22,7 +22,13 @@ class BaseModule(pl.LightningModule):
 
     def configure_optimizers(self):
         opt = hydra.utils.instantiate(
-            self.hparams.optimizer.optimizer, params=self.parameters(), _convert_="partial"
+            self.hparams.optimizer.optimizer, 
+            params=[
+                {'params':self.graph_encoder.parameters(), 'lr':self.hparams.optimizer.optimizer.lr*50},
+                {'params':self.text_encoder.parameters(), 'lr':self.hparams.optimizer.optimizer.lr},
+                {'params':self.loss.parameters(), 'lr':self.hparams.optimizer.optimizer.lr},
+            ], 
+            _convert_="partial"
         )
         if not self.hparams.optimizer.use_lr_scheduler:
             return [opt]
@@ -239,14 +245,14 @@ class CLaMPLite(BaseModule):
         # Instantiate the encoders and tokenizers
         self.graph_encoder = hydra.utils.instantiate(self.hparams.graph_encoder, _recursive_=False)
         self.text_encoder = AutoModel.from_pretrained(self.hparams.datamodule.tokenizer_model)
-        self.text_out_dim = BertConfig.from_pretrained(self.hparams.datamodule.tokenizer_model).hidden_size
+        self.text_out_dim = AutoConfig.from_pretrained(self.hparams.datamodule.tokenizer_model).hidden_size
         
         self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.datamodule.tokenizer_model)
         
         # Instantiate the augmentation modules
         self.graph_aug = hydra.utils.instantiate(self.hparams.graph_augmentation, _recursive_=False)
         self.text_aug = hydra.utils.instantiate(
-            self.hparams.text_augmentation, mask_token=self.tokenizer.mask_token_id, _recursive_=False)
+            self.hparams.text_augmentation, _recursive_=False)
 
         # Instantiate the loss module
         self.loss = JSDInfoMaxLoss(
@@ -274,9 +280,9 @@ class CLaMPLite(BaseModule):
         '''
         graphs, aug_graphs, texts, aug_texts = inputs
         graph_feat = self.graph_encoder(graphs)
-        text_feat = self.text_encoder(**texts).last_hidden_state[:,0]
+        text_feat = self.text_encoder(input_ids=texts['input_ids'], attention_mask=texts['attention_mask']).last_hidden_state[:,0]
         aug_graph_feat = self.graph_encoder(aug_graphs) if self.hparams.augmentation else None
-        aug_text_feat = self.text_encoder(**aug_texts).last_hidden_state[:,0] if self.hparams.augmentation else None
+        aug_text_feat = self.text_encoder(input_ids=aug_texts['input_ids'], attention_mask=aug_texts['attention_mask']).last_hidden_state[:,0] if self.hparams.augmentation else None
         return graph_feat, text_feat, aug_graph_feat, aug_text_feat
         
     def clamp_loss(self, graph_feat, text_feat, aug_graph_feat, aug_text_feat, mode):
@@ -404,6 +410,7 @@ class JSDInfoMaxLoss(nn.Module):
         aug_image_features=None,
         aug_text_features=None,
     ):
+        batch_size = image_features.shape[0]
         # Prior losses
         PRIOR = torch.tensor(0.0).cuda()
         # Image prior loss
@@ -435,7 +442,8 @@ class JSDInfoMaxLoss(nn.Module):
             # text_features_prime = torch.cat(
             #     (text_features[1:], text_features[0].unsqueeze(0)), dim=0
             # )  # Shift one
-            text_features_prime = torch.roll(text_features.clone(), 1, dims=0)
+            i = torch.randint(1, batch_size, (1,)).item()
+            text_features_prime = torch.roll(text_features.clone(), i, dims=0)
             similarity, _, _ = self.global_d(
                 features1=image_features,
                 features2=text_features_prime,
@@ -457,10 +465,12 @@ class JSDInfoMaxLoss(nn.Module):
             ).mean()
 
             # Shuffle text_features so have half batch does not have hard negatives
-            text_features = torch.cat(
-                (text_features[1:], text_features[0].unsqueeze(0)), dim=0
-            )  # Shift one
+            # text_features = torch.cat(
+            #     (text_features[1:], text_features[0].unsqueeze(0)), dim=0
+            # )  # Shift one
 
+            i = torch.randint(1, batch_size, (1,)).item()
+            text_features = torch.roll(text_features.clone(), i, dims=0)
             # Negative pairs
             text_features_prime_all = torch.cat(
                 (neg_text_features, text_features), dim=0
@@ -488,7 +498,8 @@ class JSDInfoMaxLoss(nn.Module):
             # aug_image_features_prime = torch.cat(
             #     (aug_image_features[1:], aug_image_features[0].unsqueeze(0)), dim=0
             # )
-            aug_image_features_prime = torch.roll(aug_image_features.clone(), 1, dims=0)
+            i = torch.randint(1, batch_size, (1,)).item()
+            aug_image_features_prime = torch.roll(aug_image_features.clone(), i, dims=0)
             similarity, _, _ = self.visual_d(
                 features1=image_features,
                 features2=aug_image_features_prime,
@@ -510,7 +521,8 @@ class JSDInfoMaxLoss(nn.Module):
             # aug_text_features_prime = torch.cat(
             #     (aug_text_features[1:], aug_text_features[0].unsqueeze(0)), dim=0
             # )
-            aug_text_features_prime = torch.roll(aug_text_features.clone(), 1, dims=0)
+            i = torch.randint(1, batch_size, (1,)).item()
+            aug_text_features_prime = torch.roll(aug_text_features.clone(), i, dims=0)
             similarity, _, _ = self.textual_d(
                 features1=text_features,
                 features2=aug_text_features_prime,

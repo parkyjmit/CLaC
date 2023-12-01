@@ -206,7 +206,8 @@ def main(args):
                             query = periodic_table[query]
                         else:
                             query = query
-                result = search_paper_paragraphs(df, mat['reduced_formula'])
+                # result = search_paper_paragraphs(df, mat['reduced_formula'])
+                result = search_paper_paragraphs(df, query)
                 mat['paragraphs'] = result[0]
                 mat['doi'] = result[1]
                 mat['num_papers'] = len(result[1])
