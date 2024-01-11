@@ -1,2 +1,2 @@
 _target_: data.augmentation.GraphPerturbationAugmentation
-perturbation: 0.1
+perturbation: 0.05
