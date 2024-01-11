@@ -87,7 +87,7 @@ def main(cfg):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-path', type=str, default='/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_materials_graphs_gpt_questions')
+    parser.add_argument('--data-path', type=str, default='/home/lucky/Projects/CLaMP/datafiles/mp_3d_2020_materials_graphs_gpt_questions')
     # parser.add_argument('--data-path', type=str, default='/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_nuclear_questions_0')
     # parser.add_argument('--data-path', type=str, default={
     #     'train': '/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_materials_graphs_gpt_questions_train.parquet',
@@ -109,11 +109,12 @@ if __name__ == '__main__':
     # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-02/13-51-53/epoch=38-step=34515.ckpt')  # merged
     # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-19/11-05-21/epoch=87-step=77880.ckpt')  # merged - painn
     # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-12-01/09-27-24/epoch=9-step=1980.ckpt')  # crystal only
-    parser.add_argument('--model-ckpt', type=str, default='outputs/2023-12-01/12-31-20/epoch=9-step=8850.ckpt')  # merged - painn - dlr
+    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-12-01/12-31-20/epoch=9-step=8850.ckpt')  # merged - painn - dlr
+    parser.add_argument('--model-ckpt', type=str, default='outputs/2023-12-02/13-23-39/epoch=10-step=275.ckpt')  # painn-merged-2048
     
     
 
-    parser.add_argument('--device', type=str, default='cuda:3')
+    parser.add_argument('--device', type=str, default='cpu')
 
     parser.add_argument('--evaluation-method', type=str, default='zero-shot QA', choices=['zero-shot QA', 'zero-shot retrieval', 'few-shot QA', 'few-shot retrieval'])
 

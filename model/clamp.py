@@ -24,7 +24,7 @@ class BaseModule(pl.LightningModule):
         opt = hydra.utils.instantiate(
             self.hparams.optimizer.optimizer, 
             params=[
-                {'params':self.graph_encoder.parameters(), 'lr':self.hparams.optimizer.optimizer.lr*50},
+                {'params':self.graph_encoder.parameters(), 'lr':self.hparams.optimizer.optimizer.lr*10},
                 {'params':self.text_encoder.parameters(), 'lr':self.hparams.optimizer.optimizer.lr},
                 {'params':self.loss.parameters(), 'lr':self.hparams.optimizer.optimizer.lr},
             ], 

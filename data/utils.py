@@ -2,8 +2,8 @@
 import requests
 import pandas as pd
 import numpy as np
-from jarvis.core.atoms import Atoms
-from jarvis.core.graphs import Graph
+# from jarvis.core.atoms import Atoms
+# from jarvis.core.graphs import Graph
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
