@@ -12,7 +12,7 @@ from jarvis.analysis.structure.spacegroup import Spacegroup3D
 import pandas as pd
 import numpy as np
 from transformers.models.graphormer.collating_graphormer import preprocess_item, GraphormerDataCollator
-# from atoms2graph import AtomsToGraphs
+from atoms2graph import AtomsToGraphs
 import json
 from pandarallel import pandarallel 
 from joblib import Parallel, delayed
@@ -200,25 +200,31 @@ class JarvisToJson:
         data = np.array_split(data, 12)
 
         results = Parallel(n_jobs=12)(delayed(self.treat_chunk)(chunk) for chunk in tqdm(data))
-        results = pd.concat(results)
-        results = results.to_list()
+        results = pd.DataFrame(sum(results, []))
+        # results = pd.concat(results)
+        # results = results.to_list()
         # save to json
         if split >= 0:
-            with open(f'{db_name}_{split+1}_data.json', 'w') as f:
-                json.dump(results, f)
+            results.to_parquet(f'{db_name}_{split+1}_data.parquet')
+            # with open(f'{db_name}_{split+1}_data.json', 'w') as f:
+            #     json.dump(results, f)
         else:
-            with open(f'{db_name}_data.json', 'w') as f:
-                json.dump(results, f)
+            results.to_parquet(f'{db_name}_data.parquet')
+            # with open(f'{db_name}_data.json', 'w') as f:
+            #     json.dump(results, f)
         return results
     
     def treat_chunk(self, chunk):
         result = []
-        for atom in chunk['atoms']:
+        for _, row in chunk.iterrows():
             try:
-                result.append(self.generate_graph_and_text(atom))
+                item = self.generate_graph_and_text(row['atoms'])
+                # for k, v in item.items():
+                #     row[k] = v
+                result.append(item)
             except:
                 pass
-        result = pd.Series(result)
+        # result = pd.Series(result)
         return result
 
     def generate_graph_and_text(self, atoms):
@@ -229,7 +235,7 @@ class JarvisToJson:
         '''
         jatoms = Atoms.from_dict(atoms)
         # Generate graph
-        dglgraph = Graph.atom_dgl_multigraph(jatoms, compute_line_graph=False, atom_features='atomic_number')
+        dglgraph = Graph.atom_dgl_multigraph(jatoms, compute_line_graph=False, atom_features='cgcnn')
         item = {}
         edges = dglgraph.edges()
         item['edge_index'] = [edges[0].tolist(), edges[1].tolist()]
@@ -248,8 +254,8 @@ class JarvisToJson:
     
 
 def main():
-    dbs = ['dft_3d']
-    split = 3
+    dbs = ['dft_3d_2021']
+    split = -1
     converter = JarvisToJson()
     for db in dbs:
         converter.convert(db, split)

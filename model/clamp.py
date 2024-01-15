@@ -7,11 +7,10 @@ import numpy as np
 import torch
 from torch import nn, einsum
 import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModel, AutoConfig
+from transformers import BertTokenizer, BertForMaskedLM, BertConfig
 from data.augmentation import GraphAttrMaskingAugmentation, GraphPerturbationAugmentation, TokenRandomMaskingAugmentation
 import random
-
-
+from peft import get_peft_model, LoraConfig
 
 
 class BaseModule(pl.LightningModule):
@@ -23,11 +22,12 @@ class BaseModule(pl.LightningModule):
     def configure_optimizers(self):
         opt = hydra.utils.instantiate(
             self.hparams.optimizer.optimizer, 
-            params=[
-                {'params':self.graph_encoder.parameters(), 'lr':self.hparams.optimizer.optimizer.lr*10},
-                {'params':self.text_encoder.parameters(), 'lr':self.hparams.optimizer.optimizer.lr},
-                {'params':self.loss.parameters(), 'lr':self.hparams.optimizer.optimizer.lr},
-            ], 
+            # params=[
+            #     {'params':self.graph_encoder.parameters(), 'lr':self.hparams.optimizer.optimizer.lr*10},
+            #     {'params':self.text_encoder.parameters(), 'lr':self.hparams.optimizer.optimizer.lr},
+            #     {'params':self.loss.parameters(), 'lr':self.hparams.optimizer.optimizer.lr},
+            # ], 
+            params=self.parameters(),
             _convert_="partial"
         )
         if not self.hparams.optimizer.use_lr_scheduler:
@@ -90,7 +90,7 @@ class CLaMP(BaseModule):
         self.graph_encoder = hydra.utils.instantiate(self.hparams.graph_encoder)
         self.text_encoder = hydra.utils.instantiate(self.hparams.text_encoder)
         
-        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.text_encoder.llm)
+        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.text_encoder.llm)
 
         self.graph_augmentation = hydra.utils.instantiate(self.hparams.graph_augmentation)
         self.text_augmentation = hydra.utils.instantiate(self.hparams.text_augmentation, mask_token=self.tokenizer.mask_token)
@@ -168,7 +168,7 @@ class DeCLaMP(pl.LightningModule):
         self.save_hyperparameters(ignore=['graph_encoder', 'text_encoder'])
         self.cfg = cfg
         
-        self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.model_link)
+        self.tokenizer = BertTokenizer.from_pretrained(self.cfg.model_link)
         self.graph_augmentation_1 = GraphAttrMaskingAugmentation(cfg)
         self.graph_augmentation_2 = GraphPerturbationAugmentation(cfg)
         self.text_augmentation = TokenRandomMaskingAugmentation(cfg, self.tokenizer.mask_token)
@@ -237,20 +237,144 @@ class DeCLaMP(pl.LightningModule):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.hparams.lr)        
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
         return {'optimizer': optimizer, 'lr_scheduler': {'scheduler': scheduler}}
+
+
+class GNNSSL(BaseModule):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # Instantiate the encoders and tokenizers
+        self.graph_encoder = hydra.utils.instantiate(self.hparams.graph_encoder, _recursive_=False)
+                
+        # Instantiate the augmentation modules
+        self.graph_aug_1 = hydra.utils.instantiate(self.hparams.graph_augmentation1, _recursive_=False)
+        self.graph_aug_2 = hydra.utils.instantiate(self.hparams.graph_augmentation2, _recursive_=False)
+
+        # Instantiate the loss module
+        self.loss = JSDInfoMaxLoss(
+            image_dim=self.hparams.graph_encoder.out_dim,
+            text_dim=self.hparams.graph_encoder.out_dim,
+            type="dot",
+            prior_weight=0.1,
+            image_prior=True,
+            text_prior=True,
+            visual_self_supervised=False,
+            textual_self_supervised=False,
+        )
+
+    def on_before_batch_transfer(self, batch: Any, dataloader_idx: int) -> Any:
+        graphs, texts = batch
+        # Augment the graphs and texts only if augmentation is enabled
+        aug_graphs_1 = self.graph_aug_1(graphs) if self.hparams.augmentation else None
+        aug_graphs_2 = self.graph_aug_2(graphs) if self.hparams.augmentation else None
+        return aug_graphs_1, aug_graphs_2
     
+    def forward(self, inputs):
+        '''
+        graph_logits: (batch_size, clamp_dim)
+        text_logits: (batch_size, clamp_dim)
+        '''
+        aug_graphs_1, aug_graphs_2 = inputs
+        graph_feat_1 = self.graph_encoder(aug_graphs_1)
+        graph_feat_2 = self.graph_encoder(aug_graphs_2)
+        return graph_feat_1, graph_feat_2
+        
+    def clamp_loss(self, graph_feat_1, graph_feat_2, mode):
+        # prepare negative samples by randomly rolling batch
+        # neg_graph_feat = aug_graph_feat if self.hparams.augmentation else graph_feat
+        # neg_text_feat = aug_text_feat if self.hparams.augmentation else text_feat
+        # rn = random.randint(1, self.hparams.datamodule.batch_size-1)
+        # neg_graph_feat = torch.roll(neg_graph_feat, rn, dims=0)
+        # neg_text_feat = torch.roll(neg_text_feat, rn, dims=0)
+        
+        # Compute Jensen-Shannon Divergence loss
+        loss_dict, gt_logits = self.loss(
+            image_features=graph_feat_1,
+            text_features=graph_feat_2,
+            neg_image_features=None,
+            neg_text_features=None,
+            aug_image_features=None,
+            aug_text_features=None,
+        )
+
+        self.log_dict(loss_dict, prog_bar=False, on_step=True, on_epoch=True, batch_size=graph_feat_1.shape[0], sync_dist=True)
+        if mode != 'train':
+            self_mask = torch.eye(gt_logits.shape[0], device=gt_logits.device, dtype=torch.bool)
+            comb_sim = torch.cat([gt_logits[self_mask][:,None], gt_logits.masked_fill(self_mask, -torch.inf)], dim=-1)
+            sim_argsort = comb_sim.argsort(dim=-1, descending=True).argmin(dim=-1)
+            self.log(mode + "_acc_top1", (sim_argsort == 0).float().mean(), prog_bar=True, batch_size=graph_feat_1.shape[0], sync_dist=True)
+            self.log(mode + "_acc_top3", (sim_argsort < 3).float().mean(), prog_bar=True, batch_size=graph_feat_1.shape[0], sync_dist=True)
+            self.log(mode + "_acc_top10", (sim_argsort < 10).float().mean(), prog_bar=True, batch_size=graph_feat_1.shape[0], sync_dist=True)
+            # self.log(mode + "_acc_top50", (sim_argsort < 50).float().mean())
+        self.log(mode + "_loss", loss_dict['total_loss'], prog_bar=True, batch_size=graph_feat_1.shape[0], sync_dist=True)
+        return loss_dict
+
+    def training_step(self, batch, batch_idx):
+        graph_feat_1, graph_feat_2 = self(batch)
+        loss_dict = self.clamp_loss(graph_feat_1, graph_feat_2, 'train')
+        return loss_dict['total_loss']
+    
+    def validation_step(self, batch, batch_idx):
+        graph_feat_1, graph_feat_2 = self(batch)
+        loss_dict = self.clamp_loss(graph_feat_1, graph_feat_2, 'val')
+        return loss_dict['total_loss']
+    
+    def test_step(self, batch, batch_idx):
+        graph_feat_1, graph_feat_2 = self(batch)
+        loss_dict = self.clamp_loss(graph_feat_1, graph_feat_2, 'test')
+        return loss_dict['total_loss']
+    
+    def configure_optimizers(self):
+        opt = hydra.utils.instantiate(
+            self.hparams.optimizer.optimizer, 
+            params=self.parameters(), 
+            _convert_="partial"
+        )
+        if not self.hparams.optimizer.use_lr_scheduler:
+            return [opt]
+        scheduler = hydra.utils.instantiate(
+            self.hparams.scheduler, optimizer=opt
+        )
+        return {"optimizer": opt, "lr_scheduler": scheduler, "monitor": "val_loss"}
 
 class CLaMPLite(BaseModule):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         # Instantiate the encoders and tokenizers
         self.graph_encoder = hydra.utils.instantiate(self.hparams.graph_encoder, _recursive_=False)
-        self.text_encoder = AutoModel.from_pretrained(self.hparams.datamodule.tokenizer_model)
-        self.text_out_dim = AutoConfig.from_pretrained(self.hparams.datamodule.tokenizer_model).hidden_size
+        self.crystal_system_readout = torch.nn.Sequential(
+            torch.nn.Linear(self.hparams.graph_encoder.out_dim, 256),
+            torch.nn.SiLU(),
+            torch.nn.Linear(256, 256),
+            torch.nn.SiLU(),
+            torch.nn.Linear(256, 7),
+            torch.nn.Softmax(dim=-1)
+        )
+        self.text_encoder = BertForMaskedLM.from_pretrained(self.hparams.datamodule.tokenizer_model)
+        self.text_encoder.config.output_hidden_states = True
         
-        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.datamodule.tokenizer_model)
+        # # Lora Config
+        # lora_alpha = 128
+        # lora_dropout = 0.05
+        # lora_r = 256
+        
+        # config = LoraConfig(
+        #     r=lora_r,
+        #     lora_alpha=lora_alpha,
+        #     lora_dropout=lora_dropout,
+        #     bias="none",
+        #     task_type="SEQ_CLS",
+        #     # target_modules=[
+        #     #     "q_proj",
+        #     # ]
+        # )
+        # self.text_encoder = get_peft_model(self.text_encoder, config)
+        self.text_out_dim = BertConfig.from_pretrained(self.hparams.datamodule.tokenizer_model).hidden_size
+        
+        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.datamodule.tokenizer_model)
         
         # Instantiate the augmentation modules
-        self.graph_aug = hydra.utils.instantiate(self.hparams.graph_augmentation, _recursive_=False)
+        self.graph_aug_1 = hydra.utils.instantiate(self.hparams.graph_augmentation1, _recursive_=False)
+        self.graph_aug_2 = hydra.utils.instantiate(self.hparams.graph_augmentation2, _recursive_=False)
         self.text_aug = hydra.utils.instantiate(
             self.hparams.text_augmentation, _recursive_=False)
 
@@ -269,7 +393,9 @@ class CLaMPLite(BaseModule):
     def on_before_batch_transfer(self, batch: Any, dataloader_idx: int) -> Any:
         graphs, texts = batch
         # Augment the graphs and texts only if augmentation is enabled
-        aug_graphs = self.graph_aug(graphs) if self.hparams.augmentation else None
+        graphs = self.graph_aug_1(graphs) if self.hparams.augmentation else graphs
+        aug_graphs = self.graph_aug_2(graphs) if self.hparams.augmentation else None
+        texts = self.text_aug(texts) if self.hparams.augmentation else texts
         aug_texts = self.text_aug(texts) if self.hparams.augmentation else None
         return graphs, aug_graphs, texts, aug_texts
     
@@ -278,21 +404,35 @@ class CLaMPLite(BaseModule):
         graph_logits: (batch_size, clamp_dim)
         text_logits: (batch_size, clamp_dim)
         '''
+        # Prepare batch
         graphs, aug_graphs, texts, aug_texts = inputs
+        # encode graph
         graph_feat = self.graph_encoder(graphs)
-        text_feat = self.text_encoder(input_ids=texts['input_ids'], attention_mask=texts['attention_mask']).last_hidden_state[:,0]
         aug_graph_feat = self.graph_encoder(aug_graphs) if self.hparams.augmentation else None
-        aug_text_feat = self.text_encoder(input_ids=aug_texts['input_ids'], attention_mask=aug_texts['attention_mask']).last_hidden_state[:,0] if self.hparams.augmentation else None
-        return graph_feat, text_feat, aug_graph_feat, aug_text_feat
+        crys_loss_graph = F.cross_entropy(self.crystal_system_readout(graph_feat),  graphs.y)
+        crys_loss_aug_graph = F.cross_entropy(self.crystal_system_readout(aug_graph_feat),  aug_graphs.y) if self.hparams.augmentation else None
+        crys_loss = (crys_loss_graph + crys_loss_aug_graph) / 2 if self.hparams.augmentation else crys_loss_graph
+        # encode text
+        output = self.text_encoder(
+            input_ids=texts['input_ids'], 
+            attention_mask=texts['attention_mask'],
+            token_type_ids=texts['token_type_ids'],
+            labels=texts['labels']
+            )
+        loss_texts = output.loss
+        text_feat = output.hidden_states[-1][:,0]
+        output = self.text_encoder(
+            input_ids=aug_texts['input_ids'], 
+            attention_mask=aug_texts['attention_mask'],
+            token_type_ids=aug_texts['token_type_ids'],
+            labels=aug_texts['labels']
+            ) if self.hparams.augmentation else None
+        loss_aug_texts = output.loss if self.hparams.augmentation else None
+        aug_text_feat = output.hidden_states[-1][:,0] if self.hparams.augmentation else None
+        mlm_loss = (loss_texts + loss_aug_texts) / 2 if self.hparams.augmentation else loss_texts
+        return graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss
         
-    def clamp_loss(self, graph_feat, text_feat, aug_graph_feat, aug_text_feat, mode):
-        # prepare negative samples by randomly rolling batch
-        # neg_graph_feat = aug_graph_feat if self.hparams.augmentation else graph_feat
-        # neg_text_feat = aug_text_feat if self.hparams.augmentation else text_feat
-        # rn = random.randint(1, self.hparams.datamodule.batch_size-1)
-        # neg_graph_feat = torch.roll(neg_graph_feat, rn, dims=0)
-        # neg_text_feat = torch.roll(neg_text_feat, rn, dims=0)
-        
+    def clamp_loss(self, graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss, mode):
         # Compute Jensen-Shannon Divergence loss
         loss_dict, gt_logits = self.loss(
             image_features=graph_feat,
@@ -303,31 +443,35 @@ class CLaMPLite(BaseModule):
             aug_text_features=aug_text_feat,
         )
 
-        self.log_dict(loss_dict, prog_bar=False, on_step=True, on_epoch=True, batch_size=graph_feat.shape[0], sync_dist=True)
+        loss_dict['mlm_loss'] = mlm_loss
+        loss_dict['crys_loss'] = crys_loss
+        loss_dict['total_loss'] = loss_dict['total_loss'] + mlm_loss / 10 + crys_loss
+        
+        self.log_dict(loss_dict, prog_bar=False, on_step=False, on_epoch=True, batch_size=graph_feat.shape[0], sync_dist=True)
         if mode != 'train':
             self_mask = torch.eye(gt_logits.shape[0], device=gt_logits.device, dtype=torch.bool)
             comb_sim = torch.cat([gt_logits[self_mask][:,None], gt_logits.masked_fill(self_mask, -torch.inf)], dim=-1)
             sim_argsort = comb_sim.argsort(dim=-1, descending=True).argmin(dim=-1)
             self.log(mode + "_acc_top1", (sim_argsort == 0).float().mean(), prog_bar=True, batch_size=graph_feat.shape[0], sync_dist=True)
             self.log(mode + "_acc_top3", (sim_argsort < 3).float().mean(), prog_bar=True, batch_size=graph_feat.shape[0], sync_dist=True)
-            self.log(mode + "_acc_top10", (sim_argsort < 10).float().mean(), prog_bar=True, batch_size=graph_feat.shape[0], sync_dist=True)
+            # self.log(mode + "_acc_top10", (sim_argsort < 10).float().mean(), prog_bar=True, batch_size=graph_feat.shape[0], sync_dist=True)
             # self.log(mode + "_acc_top50", (sim_argsort < 50).float().mean())
         self.log(mode + "_loss", loss_dict['total_loss'], prog_bar=True, batch_size=graph_feat.shape[0], sync_dist=True)
         return loss_dict
 
     def training_step(self, batch, batch_idx):
-        graph_feat, text_feat, aug_graph_feat, aug_text_feat= self(batch)
-        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, 'train')
+        graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss = self(batch)
+        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss,'train')
         return loss_dict['total_loss']
     
     def validation_step(self, batch, batch_idx):
-        graph_feat, text_feat, aug_graph_feat, aug_text_feat= self(batch)
-        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, 'val')
+        graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss = self(batch)
+        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss,'val')
         return loss_dict['total_loss']
     
     def test_step(self, batch, batch_idx):
-        graph_feat, text_feat, aug_graph_feat, aug_text_feat= self(batch)
-        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, 'test')
+        graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss = self(batch)
+        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss,'test')
         return loss_dict['total_loss']
     
 
@@ -659,7 +803,14 @@ class GraphSupervisedLearning(BaseModule):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         # Instantiate the encoders and tokenizers
-        self.graph_encoder = hydra.utils.instantiate(self.hparams.graph_encoder, _recursive_=False)
+        if self.hparams.fine_tune_from is not None:
+            if self.hparams.base_model_type == 'clamp':
+                model = CLaMPLite.load_from_checkpoint(self.hparams.fine_tune_from, map_location={'cuda:0': 'cpu'})
+            elif self.hparams.base_model_type == 'ssl':
+                model = GNNSSL.load_from_checkpoint(self.hparams.fine_tune_from, map_location={'cuda:0': 'cpu'})
+            self.graph_encoder = model.graph_encoder
+        else:
+            self.graph_encoder = hydra.utils.instantiate(self.hparams.graph_encoder, _recursive_=False)
         self.projection_head = nn.Linear(self.hparams.graph_encoder.out_dim, self.hparams.num_classes)
         self.validation_step_outputs = []
         self.test_step_outputs = []
@@ -678,7 +829,7 @@ class GraphSupervisedLearning(BaseModule):
         if self.task == 'classification':
             loss = F.cross_entropy(y_pred, label)
         elif self.task == 'regression':
-            loss = F.mse_loss(y_pred, label)
+            loss = F.mse_loss(y_pred.squeeze(), label.squeeze())
         self.log(mode + "_loss", loss, prog_bar=False, on_step=True, on_epoch=True, batch_size=y_pred.shape[0], sync_dist=True)
         return loss
 
@@ -704,7 +855,7 @@ class GraphSupervisedLearning(BaseModule):
     def on_validation_epoch_end(self):
         outputs = self.validation_step_outputs
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        self.log('val_loss', avg_loss)
+        self.log('val_loss', avg_loss, prog_bar=True, on_epoch=True)
         if self.task == 'classification':
             total_correct = sum(x['correct_count'] for x in outputs)
             total_count = sum(x['total_count'] for x in outputs)

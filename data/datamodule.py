@@ -32,9 +32,9 @@ class CLaMPBaseDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
         self.debug = debug
-        if tokenizer_model == 'facebook/galactica-125m':
-            self.tokenizer.pad_token_id = 1
-            self.tokenizer.mask_token_id = 3
+        # if tokenizer_model == 'facebook/galactica-125m':
+        #     self.tokenizer.pad_token_id = 1
+        #     self.tokenizer.mask_token_id = 3
         # self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def setup(self, stage=None):
@@ -96,10 +96,10 @@ class CLaMPDataModule(CLaMPBaseDataModule):
 def graph_data_collator(features: List[dict]) -> Dict[str, Any]:
     """
     """
-    return Batch.from_data_list([Data(x=torch.tensor(f["node_feat"]), 
+    return Batch.from_data_list([Data(x=torch.tensor(f["node_feat"], dtype=torch.float32), 
                                       edge_index=torch.tensor(f['edge_index']), 
-                                      edge_attr=torch.tensor(f['edge_attr']),
-                                      y=torch.tensor(f['y'], dtype=torch.int)) for f in features])
+                                      edge_attr=torch.tensor(f['edge_attr'], dtype=torch.float32),
+                                      y=torch.tensor(f['y'], dtype=torch.float32)) for f in features])
 
 
 def text_data_collator(features: List[dict], token_fn) -> Dict[str, Any]:

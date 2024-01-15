@@ -39,12 +39,16 @@ class TokenRandomMaskingAugmentation(nn.Module):
 
     @torch.no_grad()
     def forward(self, texts: dict) -> torch.Tensor:
-        tokens = texts['input_ids']
-        tokens = tokens.clone()
+        input_ids = texts['input_ids'].clone()
         # mask token as <masked> token with probability cfg.mask_prob
-        mask = torch.rand(tokens.shape) < self.mask_prob
-        tokens[mask] = self.mask_token
-        texts['input_ids'] = tokens
+        mask = torch.rand(input_ids.shape) < self.mask_prob
+        input_ids[mask] = self.mask_token
+        # set labels as original tokens
+        labels = texts["input_ids"].clone()
+        labels[input_ids != self.mask_token] = -100
+        # update texts
+        texts['labels'] = labels
+        texts['input_ids'] = input_ids
         return texts
     
 

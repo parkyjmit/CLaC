@@ -11,3 +11,7 @@ outputs
 logs
 data/preprocess.ipynb
 # *.ipynb
+pretrained_model
+*.png
+supervised_ckpt
+*.out

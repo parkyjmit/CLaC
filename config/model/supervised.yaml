@@ -5,15 +5,17 @@ datamodule:
   batch_size: ${hyperparams.batch_size}
   num_workers: ${hyperparams.num_workers}
   tokenizer_model: ${llm}
-  label: crystal system
-  task: classification
+  label: Band_gap_GGA
+  task: regression
   debug: ${debug}
 
 num_classes: None
-
 augmentation: True
+
+fine_tune_from: outputs/2023-12-01/12-31-20/epoch=19-step=17700.ckpt
+base_model_type: clamp
 
 defaults:
   - graph_encoder: painn
   - optimizer: adamw
-  - scheduler: cosinewarm
+  - scheduler: plateau
