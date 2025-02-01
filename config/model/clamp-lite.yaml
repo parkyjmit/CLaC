@@ -1,11 +1,13 @@
 _target_: model.clamp.CLaMPLite
 datamodule:
-  _target_: data.datamodule.CLaMPDataModule
+  _target_: data.datamodule.CLaCDataModule
   data_path: ${paths.data}
   batch_size: ${hyperparams.batch_size}
   num_workers: ${hyperparams.num_workers}
   tokenizer_model: ${llm}
-  debug: ${debug}
+  debug: ${debug}  
+  datatype: papers # narratives, papers
+  sentencewise: True
 
 augmentation: True
 

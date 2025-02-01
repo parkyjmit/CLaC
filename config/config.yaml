@@ -1,16 +1,16 @@
-exp_name: clamp-painn-matsci-gpt-mlm-10crys-1024
+exp_name: clac-mp-paper-sw
 debug: False
 paths:
   log: /var/log/yourapp.log
-  data: /home/lucky/Projects/CLaMP/datafiles/mp_3d_2020_materials_graphs_gpt_questions  # mp_3d_2020_materials_graphs_gpt_questions, mp_3d_2020_cif_papers, mp_3d_2020_merged, data/electrolytes_sep_paragraphs
+  data: /path/to/example
 hyperparams: 
-  emb_dim: 512  # 256
-  batch_size: 16  # clamp-lite: 16, supervised: 256, ssl: 128
-  num_workers: 6
+  emb_dim: 512  
+  batch_size: 32  
+  num_workers: 12
 
-llm: m3rg-iitd/matscibert #facebook/galactica-125m #allenai/scibert_scivocab_cased #distilbert-base-uncased #bert-base-cased #allenai/scibert_scivocab_cased
+llm: m3rg-iitd/matscibert 
 defaults:
   - logging: default
-  - model: clamp-lite # supervised, clamp-lite, self-supervised
+  - model: clamp-lite 
   - trainer: default
 

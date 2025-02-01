@@ -1,17 +1,22 @@
+# Environment variables
 .env
+
+# Logs
 lightning_logs
-__pycache__
-*_data.json
-liquid_electrolytes.txt
-jsons
-*.json
-*.parquet
-wandb
 outputs
 logs
-data/preprocess.ipynb
-# *.ipynb
-pretrained_model
-*.png
-supervised_ckpt
 *.out
+__pycache__
+wandb
+pretrained_model
+supervised_ckpt
+
+# Notebooks
+# *.ipynb
+liquid_electrolytes.txt
+data/preprocess.ipynb
+## Data
+*.parquet
+*_data.json
+jsons
+*.json

@@ -37,8 +37,6 @@ def main(cfg):
     model.eval()
     # setting
     model.text_encoder.config.output_hidden_states = True
-    # dm.token_fn = lambda x: dm.tokenizer(x, padding='max_length', truncation=True, max_length=512)
-    # print vram usage
 
     # Evaluation
     answer_cnt = 0
@@ -48,14 +46,11 @@ def main(cfg):
     acc_top3s = []
     acc_top10s = []
     for batch_i, batch in tqdm(enumerate(test_dataloader)):
-        if batch_i > 1000:
-            break
         graphs, questions = batch
         graphs = graphs.to(model.device)
         questions = {k: v.to(model.device) for k, v in questions.items()}
 
         # decode batch to text
-        # print(model.tokenizer.decode(questions['input_ids'][0]))
         with torch.no_grad():
             g_feat = model.graph_encoder(graphs)  # (batch, hidden)
             t_feat = model.text_encoder(
@@ -75,7 +70,6 @@ def main(cfg):
                 if batch_i % 8 == 7:
                     g_stack = torch.concat(g_stack, dim=0)
                     t_stack = torch.concat(t_stack, dim=0)
-                    # gt_logits = torch.matmul(g_stack, t_stack.transpose(0, 1))
                     gt_logits = torch.matmul(t_stack, g_stack.transpose(0, 1))
                     
                     self_mask = torch.eye(gt_logits.shape[0], device=gt_logits.device, dtype=torch.bool)
@@ -90,7 +84,7 @@ def main(cfg):
                     g_stack = []
                     t_stack = []
     if cfg.evaluation_method == 'zero-shot QA':
-        print(f'Accuracy: {answer_cnt / 1000}') # len(test_dataloader)}')
+        print(f'Accuracy: {answer_cnt / len(test_dataloader)}')
     elif cfg.evaluation_method == 'zero-shot retrieval':
         print(f'Top1: {sum(acc_top1s) / len(acc_top1s)}, Top3: {sum(acc_top3s) / len(acc_top3s)}, Top10: {sum(acc_top10s) / len(acc_top10s)}')
 
@@ -98,38 +92,16 @@ def main(cfg):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-path', type=str, default='/home/lucky/Projects/CLaMP/datafiles/mp_3d_2020_materials_graphs_gpt_questions')
-    # parser.add_argument('--data-path', type=str, default='/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_nuclear_questions_0')
-    # parser.add_argument('--data-path', type=str, default={
-    #     'train': '/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_materials_graphs_gpt_questions_train.parquet',
-    #     'val': '/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_materials_graphs_gpt_questions_val.parquet',
-    #     'test': '/home/yj/PycharmProjects/MIT/CLaMP/jsons/mp_3d_2020_materials_graphs_gpt_questions_test.parquet'
-    # })
+    parser.add_argument('--data-path', type=str, default='/path/to/example')
     parser.add_argument('--batch-size', type=int, default=1, help='1 for QA')  # 8, 64, 128, 512
     parser.add_argument('--num-workers', type=int, default=12)
-    # parser.add_argument('--llm', type=str, default='allenai/scibert_scivocab_cased')
     parser.add_argument('--llm', type=str, default='m3rg-iitd/matscibert')
-    # parser.add_argument('--llm', type=str, default='facebook/galactica-125m')
     parser.add_argument('--debug', type=bool, default=False)
-    parser.add_argument('--label', type=str, default='structure_question_list', choices=['text', 'composition_question_list', 'structure_question_list', 'metal_question_list', 'semiconductor_question_list', 'stable_question_list', 'oxide_question_list', 'Statements'])
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-10-22/12-13-19/epoch=35-step=24768.ckpt')  # papers
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-10-21/03-47-05/epoch=9-step=1980.ckpt')  # GPT
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-11/14-27-14/epoch=39-step=27520.ckpt')  # papers-painn
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-10/11-27-57/epoch=39-step=15800.ckpt')  # gpt-painn
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-09/00-24-38/epoch=38-step=15405.ckpt')  # gpt-painn-galax
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-11/04-24-47/epoch=7-step=3160.ckpt')  # gpt-cgcnn-galax
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-02/13-51-53/epoch=38-step=34515.ckpt')  # merged
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-11-19/11-05-21/epoch=87-step=77880.ckpt')  # merged - painn
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-12-01/09-27-24/epoch=9-step=1980.ckpt')  # crystal only
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-12-01/12-31-20/epoch=19-step=17700.ckpt')  # merged - painn - dlr
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2023-12-02/13-08-19/epoch=28-step=5742.ckpt')  # gpt - painn - dlr
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2024-01-11/05-26-26/epoch=38-step=15405.ckpt')  # gpt - painn - matsci - dlr
-    # parser.add_argument('--model-ckpt', type=str, default='outputs/2024-01-14/04-12-53/epoch=57-step=11484.ckpt')  # gpt - mlm
-    parser.add_argument('--model-ckpt', type=str, default='outputs/2024-01-15/15-47-15/epoch=26-step=5346.ckpt')  # gpt - cgcnn - mlm
-    
+    parser.add_argument('--label', type=str, default='structure_question_list', choices=['text', 'composition_question_list', 'structure_question_list', 'oxide_question_list'])
+    parser.add_argument('--model-ckpt', type=str, default='/path/to/ckpt')      
     
 
-    parser.add_argument('--device', type=str, default='cuda:4')
+    parser.add_argument('--device', type=str, default='cuda')
 
     parser.add_argument('--evaluation-method', type=str, default='zero-shot QA', choices=['zero-shot QA', 'zero-shot retrieval', 'few-shot QA', 'few-shot retrieval'])
 

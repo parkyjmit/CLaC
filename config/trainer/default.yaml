@@ -1,12 +1,12 @@
 # reproducibility
-deterministic: False
+deterministic: True
 random_seed: 42
 
 # training
 
 pl_trainer:
   accelerator: gpu
-  devices: 4
+  devices: 6,7,8,9
   strategy: ddp
   precision: bf16-mixed
   # max_steps: 10000

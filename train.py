@@ -78,6 +78,7 @@ def main(cfg: DictConfig):
 
         # Switch wandb mode to offline to prevent online logging
         cfg.logging.wandb.mode = "offline"
+        cfg.trainer.pl_trainer.max_epochs = 1
 
     # Hydra run directory
     hydra_dir = Path(HydraConfig.get().run.dir)

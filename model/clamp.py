@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from transformers import BertTokenizer, BertForMaskedLM, BertConfig
 from data.augmentation import GraphAttrMaskingAugmentation, GraphPerturbationAugmentation, TokenRandomMaskingAugmentation
 import random
-from peft import get_peft_model, LoraConfig
+# from peft import get_peft_model, LoraConfig
 
 
 class BaseModule(pl.LightningModule):
@@ -341,14 +341,14 @@ class CLaMPLite(BaseModule):
         super().__init__(*args, **kwargs)
         # Instantiate the encoders and tokenizers
         self.graph_encoder = hydra.utils.instantiate(self.hparams.graph_encoder, _recursive_=False)
-        self.crystal_system_readout = torch.nn.Sequential(
-            torch.nn.Linear(self.hparams.graph_encoder.out_dim, 256),
-            torch.nn.SiLU(),
-            torch.nn.Linear(256, 256),
-            torch.nn.SiLU(),
-            torch.nn.Linear(256, 7),
-            torch.nn.Softmax(dim=-1)
-        )
+        # self.crystal_system_readout = torch.nn.Sequential(
+        #     torch.nn.Linear(self.hparams.graph_encoder.out_dim, 256),
+        #     torch.nn.SiLU(),
+        #     torch.nn.Linear(256, 256),
+        #     torch.nn.SiLU(),
+        #     torch.nn.Linear(256, 7),
+        #     torch.nn.Softmax(dim=-1)
+        # )
         self.text_encoder = BertForMaskedLM.from_pretrained(self.hparams.datamodule.tokenizer_model)
         self.text_encoder.config.output_hidden_states = True
         
@@ -409,9 +409,9 @@ class CLaMPLite(BaseModule):
         # encode graph
         graph_feat = self.graph_encoder(graphs)
         aug_graph_feat = self.graph_encoder(aug_graphs) if self.hparams.augmentation else None
-        crys_loss_graph = F.cross_entropy(self.crystal_system_readout(graph_feat),  graphs.y)
-        crys_loss_aug_graph = F.cross_entropy(self.crystal_system_readout(aug_graph_feat),  aug_graphs.y) if self.hparams.augmentation else None
-        crys_loss = (crys_loss_graph + crys_loss_aug_graph) / 2 if self.hparams.augmentation else crys_loss_graph
+        # crys_loss_graph = F.cross_entropy(self.crystal_system_readout(graph_feat),  graphs.y)
+        # crys_loss_aug_graph = F.cross_entropy(self.crystal_system_readout(aug_graph_feat),  aug_graphs.y) if self.hparams.augmentation else None
+        # crys_loss = (crys_loss_graph + crys_loss_aug_graph) / 2 if self.hparams.augmentation else crys_loss_graph
         # encode text
         output = self.text_encoder(
             input_ids=texts['input_ids'], 
@@ -430,9 +430,9 @@ class CLaMPLite(BaseModule):
         loss_aug_texts = output.loss if self.hparams.augmentation else None
         aug_text_feat = output.hidden_states[-1][:,0] if self.hparams.augmentation else None
         mlm_loss = (loss_texts + loss_aug_texts) / 2 if self.hparams.augmentation else loss_texts
-        return graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss
+        return graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss
         
-    def clamp_loss(self, graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss, mode):
+    def clamp_loss(self, graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, mode):
         # Compute Jensen-Shannon Divergence loss
         loss_dict, gt_logits = self.loss(
             image_features=graph_feat,
@@ -444,8 +444,8 @@ class CLaMPLite(BaseModule):
         )
 
         loss_dict['mlm_loss'] = mlm_loss
-        loss_dict['crys_loss'] = crys_loss
-        loss_dict['total_loss'] = loss_dict['total_loss'] + mlm_loss / 10 + crys_loss
+        # loss_dict['crys_loss'] = crys_loss
+        loss_dict['total_loss'] = loss_dict['total_loss'] + mlm_loss / 10 #+ crys_loss
         
         self.log_dict(loss_dict, prog_bar=False, on_step=False, on_epoch=True, batch_size=graph_feat.shape[0], sync_dist=True)
         if mode != 'train':
@@ -460,18 +460,18 @@ class CLaMPLite(BaseModule):
         return loss_dict
 
     def training_step(self, batch, batch_idx):
-        graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss = self(batch)
-        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss,'train')
+        graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss = self(batch)
+        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss,'train')
         return loss_dict['total_loss']
     
     def validation_step(self, batch, batch_idx):
-        graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss = self(batch)
-        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss,'val')
+        graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss = self(batch)
+        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss,'val')
         return loss_dict['total_loss']
     
     def test_step(self, batch, batch_idx):
-        graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss = self(batch)
-        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss, crys_loss,'test')
+        graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss = self(batch)
+        loss_dict = self.clamp_loss(graph_feat, text_feat, aug_graph_feat, aug_text_feat, mlm_loss,'test')
         return loss_dict['total_loss']
     
 
