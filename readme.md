@@ -2,7 +2,7 @@
 
 This is the official implementation of Contrastive Language-Crystal Pretraining (CLaC). In this work, we introduced a contrastive pretraining framework for multimodal representation learning between materials science knowledge and crystals (~126k materials-narratives pair dataset). CLaC enables multimodal tasks which was unattainable before even with latest large language models(LLMs) while improves downstream performances. Just as we interpret images and express them in words, CLaC could be a part of AI which can be utilized as a fundamental model to analyze crystal structures and identify suitable application fields, or conversely, to search for crystal structures with characteristics that align with specific applications.
 
-![]('asset/overall_architecture.png')
+![](asset/overall_architecture.png)
 
 ## Installation
 Below is the recommended conda environment setup to reproduce this work.
