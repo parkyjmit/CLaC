@@ -7,7 +7,7 @@ This is the official implementation of Contrastive Language-Crystal Pretraining 
 ![](asset/overall_architecture.png)
 
 ## Installation
-Below is the recommended conda environment setup to reproduce this work.
+Below is the recommended conda environment setup to reproduce this work. This installation can be completed on a standard workstation within 10 minutes.
 ```bash
 conda create -n clac python=3.10.13
 conda activate clac
@@ -45,7 +45,7 @@ See `yaml` files in `config` section. If you want to change training configurati
 
 ### Run pretraining
 Training code is based on pytorch lightning and hydra configuration.    
-To pretrain the CLaC model, run `python train.py` with appropriate configuration.
+To pretrain the CLaC model, run `python train.py` with appropriate configuration. The pretrained model weight will be saved in `outputs` folder. This pretraining process will be completed in 24 hours using 4-way NVIDIA RTX 3090 workstation.
 
 ## Evaluation for zero-shot tasks
 In this work, we measured zero-shot ability of our CLaC.  
