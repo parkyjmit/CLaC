@@ -1581,7 +1581,7 @@ def main(cfg):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-path', type=str, default='datafiles/mp_3d_2020_materials_graphs_gpt_questions')
+    parser.add_argument('--data-path', type=str, default='datafiles/mp_3d_2020_gpt_narratives')
     parser.add_argument('--batch-size', type=int, default=64, help='Batch size for encoding')
     parser.add_argument('--num-workers', type=int, default=12)
     parser.add_argument('--llm', type=str, default='facebook/galactica-125m')

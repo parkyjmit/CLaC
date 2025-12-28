@@ -35,7 +35,7 @@ python evaluation/compute_metrics.py \
 - `--plot`: Generate visualization plots (default: True)
 
 **General:**
-- `--data-path`: Path to data files without suffix (default: `datafiles/mp_3d_2020_materials_graphs_gpt_questions`)
+- `--data-path`: Path to data files without suffix (default: `datafiles/mp_3d_2020_gpt_narratives`)
 - `--device`: Device to use (`cpu` or `cuda`)
 - `--batch-size`: Batch size for encoding (default: 64)
 - `--llm`: Tokenizer model (default: `facebook/galactica-125m`)

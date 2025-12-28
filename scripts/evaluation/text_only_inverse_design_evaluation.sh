@@ -6,7 +6,7 @@
 
 # Configuration
 MODEL_CKPT="${1:-outputs/your-model.ckpt}"
-DATA_PATH="${2:-datafiles/mp_3d_2020_materials_graphs_gpt_questions}"
+DATA_PATH="${2:-datafiles/mp_3d_2020_gpt_narratives}"
 DEVICE="${3:-cuda:0}"
 
 echo "=========================================="

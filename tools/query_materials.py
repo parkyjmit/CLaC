@@ -330,7 +330,7 @@ def main():
     parser.add_argument(
         '--data-path',
         type=str,
-        default='/home/lucky/Projects/CLaC-revision/datafiles/mp_3d_2020_materials_graphs_gpt_questions',
+        default='/home/lucky/Projects/CLaC-revision/datafiles/mp_3d_2020_gpt_narratives',
         help='Path to dataset'
     )
     parser.add_argument(

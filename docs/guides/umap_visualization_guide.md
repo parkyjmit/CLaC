@@ -33,7 +33,7 @@ pip install umap-learn
 ```bash
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by modality \
   --embed-type both
 ```
@@ -42,7 +42,7 @@ python evaluation/visualize_embeddings.py \
 ```bash
 python evaluation/visualize_embeddings.py \
   --config config/config.yaml \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by modality \
   --embed-type both
 ```
@@ -55,7 +55,7 @@ python evaluation/visualize_embeddings.py \
 ```bash
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by property \
   --property-name bandgap \
   --embed-type both \
@@ -80,7 +80,7 @@ python evaluation/visualize_embeddings.py \
 ```bash
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by keyword \
   --keywords magnetic semiconductor \
   --embed-type both
@@ -93,7 +93,7 @@ python evaluation/visualize_embeddings.py \
 ```bash
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by text-similarity \
   --text-query "magnetic semiconductor with high conductivity" \
   --embed-type both \
@@ -124,7 +124,7 @@ python evaluation/visualize_embeddings.py \
 # Find materials similar to "high band gap insulator"
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by text-similarity \
   --text-query "high band gap insulator" \
   --embed-type both
@@ -132,7 +132,7 @@ python evaluation/visualize_embeddings.py \
 # Find materials similar to "ferromagnetic metal"
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by text-similarity \
   --text-query "ferromagnetic metal with high magnetization" \
   --embed-type graph
@@ -140,7 +140,7 @@ python evaluation/visualize_embeddings.py \
 # Find materials for specific applications
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by text-similarity \
   --text-query "transparent conducting oxide for solar cells" \
   --embed-type both
@@ -155,7 +155,7 @@ Control the structure of the UMAP embedding:
 ```bash
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by property \
   --property-name density \
   --n-neighbors 30 \
@@ -173,7 +173,7 @@ python evaluation/visualize_embeddings.py \
 ```bash
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by property \
   --property-name bandgap \
   --alpha 0.4 \
@@ -189,7 +189,7 @@ python evaluation/visualize_embeddings.py \
 ```bash
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --split train \
   --color-by property \
   --property-name density
@@ -203,7 +203,7 @@ python evaluation/visualize_embeddings.py \
 # Only graph embeddings
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --embed-type graph \
   --color-by property \
   --property-name bandgap
@@ -211,7 +211,7 @@ python evaluation/visualize_embeddings.py \
 # Only text embeddings
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/last.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --embed-type text \
   --color-by property \
   --property-name bandgap
@@ -222,7 +222,7 @@ python evaluation/visualize_embeddings.py \
 ### 0. Compare Before/After Training
 
 ```bash
-DATA=datafiles/mp_3d_2020_materials_graphs_gpt_questions
+DATA=datafiles/mp_3d_2020_gpt_narratives
 OUTPUT_BEFORE=outputs/umap_visualizations/umap_before_training
 OUTPUT_AFTER=outputs/umap_visualizations/umap_after_training
 
@@ -247,7 +247,7 @@ python evaluation/visualize_embeddings.py \
 
 ```bash
 MODEL=outputs/orb-infonce-galactica-125m/last.ckpt
-DATA=datafiles/mp_3d_2020_materials_graphs_gpt_questions
+DATA=datafiles/mp_3d_2020_gpt_narratives
 OUTPUT=outputs/umap_visualizations/umap_analysis
 
 # Modality alignment
@@ -284,7 +284,7 @@ python evaluation/visualize_embeddings.py \
 
 ```bash
 MODEL=outputs/your-model/last.ckpt
-DATA=datafiles/mp_3d_2020_materials_graphs_gpt_questions
+DATA=datafiles/mp_3d_2020_gpt_narratives
 OUTPUT=outputs/umap_visualizations/property_comparison
 
 for prop in bandgap density formation_energy magnetization; do
@@ -299,7 +299,7 @@ done
 
 ```bash
 MODEL=outputs/your-model/last.ckpt
-DATA=datafiles/mp_3d_2020_materials_graphs_gpt_questions
+DATA=datafiles/mp_3d_2020_gpt_narratives
 OUTPUT=outputs/umap_visualizations/semantic_analysis
 
 # Check different material classes
@@ -323,7 +323,7 @@ python evaluation/visualize_embeddings.py \
 
 ```bash
 MODEL=outputs/your-model/last.ckpt
-DATA=datafiles/mp_3d_2020_materials_graphs_gpt_questions
+DATA=datafiles/mp_3d_2020_gpt_narratives
 OUTPUT=outputs/umap_visualizations/query_similarity
 
 # Find materials for different applications
@@ -445,7 +445,7 @@ ValueError: Property 'your_property' not found
 # Example 1: Analyze band gap learning
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/checkpoint.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by property --property-name bandgap \
   --n-neighbors 20 --min-dist 0.05 \
   --cmap coolwarm --alpha 0.5
@@ -453,21 +453,21 @@ python evaluation/visualize_embeddings.py \
 # Example 2: Check for magnetic materials clustering
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/checkpoint.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by keyword --keywords magnetic ferromagnetic \
   --embed-type both
 
 # Example 3: Dense materials
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/checkpoint.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by property --property-name density \
   --cmap YlOrRd
 
 # Example 4: Text query similarity - find semiconductors
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/checkpoint.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by text-similarity \
   --text-query "semiconductor with moderate band gap" \
   --embed-type both --cmap coolwarm
@@ -475,7 +475,7 @@ python evaluation/visualize_embeddings.py \
 # Example 5: Text query similarity - find battery materials
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/checkpoint.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by text-similarity \
   --text-query "lithium-containing material for battery electrodes" \
   --embed-type both --cmap coolwarm
@@ -484,14 +484,14 @@ python evaluation/visualize_embeddings.py \
 # First: Color by actual band gap values
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/checkpoint.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by property --property-name bandgap \
   --output-dir outputs/umap_visualizations/comparison
 
 # Then: Color by similarity to "high band gap material"
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/checkpoint.ckpt \
-  --data-path datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+  --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by text-similarity \
   --text-query "material with high band gap" \
   --output-dir outputs/umap_visualizations/comparison

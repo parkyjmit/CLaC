@@ -738,7 +738,7 @@ def main():
     parser.add_argument('--temperature', type=float, default=None,
                        help='Sampling temperature for API calls (default: use model default, typically 1.0)')
 
-    parser.add_argument('--data-path', type=str, default='/home/lucky/Projects/CLaC-revision/datafiles/mp_3d_2020_materials_graphs_gpt_questions',
+    parser.add_argument('--data-path', type=str, default='/home/lucky/Projects/CLaC-revision/datafiles/mp_3d_2020_gpt_narratives',
                        help='Path to dataset parquet file (without _test.parquet suffix)')
     parser.add_argument('--label', type=str, default='structure_question_list',
                        choices=['composition_question_list', 'structure_question_list', 'oxide_question_list'])

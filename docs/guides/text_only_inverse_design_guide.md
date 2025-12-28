@@ -37,7 +37,7 @@ bash scripts/evaluation/text_only_inverse_design_evaluation.sh [MODEL_CKPT] [DAT
 # Example:
 bash scripts/evaluation/text_only_inverse_design_evaluation.sh \
     outputs/my_experiment/epoch=49.ckpt \
-    datafiles/mp_3d_2020_materials_graphs_gpt_questions \
+    datafiles/mp_3d_2020_gpt_narratives \
     cuda:0
 ```
 

@@ -432,7 +432,7 @@ def main():
     """
     # Define paths
     # NOTE: The user mentioned this file path is a copy.
-    data_file_path = '/home/lucky/Projects/CLaC copy/datafiles/mp_3d_2020_materials_graphs_gpt_questions_train.parquet'
+    data_file_path = '/home/lucky/Projects/CLaC copy/datafiles/mp_3d_2020_gpt_narratives_train.parquet'
     atom_init_path = '/home/lucky/Projects/CLaC-revision/atom_init.json'
 
     # 1. Get Atoms object from the specified file
