@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch_geometric import nn as gnn
 from model.utils import build_mlp, RBFExpansion
+from orb_models.forcefield import pretrained
 
     
 class GATEncoder(nn.Module):
@@ -22,7 +23,7 @@ class GraphEncoder(nn.Module):
 
 class CGCNN(nn.Module):
     def __init__(self, orig_atom_fea_len, nbr_fea_len,
-                 atom_fea_len=64, n_conv=3, h_fea_len=128, n_h=1, out_dim=1) -> None:
+                 atom_fea_len=64, n_conv=3, h_fea_len=128, n_h=1, out_dim=1, **kwargs) -> None:
         super().__init__()
         """
         Initialize CrystalGraphConvNet.
@@ -77,6 +78,7 @@ class PaiNN(nn.Module):
         cut_off=5.0,
         n_rbf=20,
         num_interactions=3,
+        **kwargs
     ):
         super(PaiNN, self).__init__()
         """PyG implementation of PaiNN network of Schütt et. al. Supports two arrays
@@ -123,7 +125,7 @@ class PaiNN(nn.Module):
         s = self.lin1(s)
         s = self.silu(s)
         s = self.lin2(s)
-        s = self.global_pool(s, batch)
+        s = self.global_pool(s, batch) # (batch_size, out_dim)
 
         return s
 
@@ -299,3 +301,38 @@ class BesselBasis(torch.nn.Module):
 
         return y
     
+
+def orb_graph_pool_mean(node_feats: torch.Tensor,
+                    n_nodes: torch.Tensor) -> torch.Tensor:
+    """
+    Args:
+      node_feats: (N_total, D) tensor of per-node features
+      n_nodes:   (B,) tensor or list giving number of nodes in each graph
+    Returns:
+      graph_feats: (B, D) tensor where each row is the mean over that graph’s nodes
+    """
+    # Ensure n_nodes is a Python list of ints
+    if isinstance(n_nodes, torch.Tensor):
+        n_nodes = n_nodes.tolist()
+
+    # Split and mean
+    chunks = torch.split(node_feats, n_nodes, dim=0)
+    graph_feats = torch.stack([c.mean(dim=0) for c in chunks], dim=0)
+    return graph_feats
+
+
+class ORB(nn.Module):
+    def __init__(self, out_dim, **kwargs):
+        """Initialize ORB model."""
+        super().__init__()
+        # Initialize ORB model parameters here
+        self.orb_model = pretrained.orb_v3_direct_20_omat(
+            device='cpu',
+            precision="float32-high",  # or "float32-highest" / "float64"
+        ).model
+
+    def forward(self, batch):
+        node_features = self.orb_model(batch)['node_features']
+        n_nodes = batch.n_node
+        graph_feats = orb_graph_pool_mean(node_features, n_nodes)
+        return graph_feats

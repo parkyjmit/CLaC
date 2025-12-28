@@ -1,0 +1,23 @@
+program: train.py
+method: grid
+metric:
+  name: val_acc_top1
+  goal: maximize
+early_terminate:
+  type: hyperband
+  min_iter: 3
+parameters:
+  hyperparams.batch_size:
+    values: [16]
+  model/loss:
+    values: ['infonce']
+  model/graph_encoder:
+    values: ['painn']
+  llm:
+    values: ['galactica-125m', 'matscibert']
+  # Intramodal loss ablation: 2x2 grid = 4 combinations
+  # Automatically applied to both model and datamodule via config inheritance
+  hyperparams.use_visual_intramodal_loss:
+    values: [true, false]
+  hyperparams.use_textual_intramodal_loss:
+    values: [true, false]

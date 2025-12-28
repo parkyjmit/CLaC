@@ -1,16 +1,30 @@
-exp_name: clac-mp-paper-sw
-debug: False
-paths:
-  log: /var/log/yourapp.log
-  data: /path/to/example
-hyperparams: 
-  emb_dim: 512  
-  batch_size: 32  
-  num_workers: 12
+exp_name: SyntheticData-${model.graph_encoder.name}-${model.loss.name}-${llm.short_name}-v${hyperparams.use_visual_intramodal_loss}-t${hyperparams.use_textual_intramodal_loss}-5epoch
 
-llm: m3rg-iitd/matscibert 
+debug: true
+hydra:
+  run:
+    dir: outputs/${exp_name}
+paths:
+  log: logs/yourapp.log
+  data: /home/lucky/Projects/CLaC-revision/datafiles/mp_3d_2020_gpt_narratives
+hyperparams:
+  # Intramodal loss control (fine-grained)
+  use_visual_intramodal_loss: true   # Graph-graph contrastive learning
+  use_textual_intramodal_loss: true  # Text-text contrastive learning
+
+  # Chemical formula replacement (for reducing formula dependency)
+  replace_formula_prob: 0.0  # Probability of replacing formulas with "material" (0.0 to disable)
+  replace_formula_start_epoch: 100  # Epoch to start formula replacement (0 = from beginning)
+
+  emb_dim: 512
+  batch_size: 16
+  num_workers: 4
+
+# Checkpoint resumption
+resume_from_checkpoint: null # Path to checkpoint to resume from (null to start fresh)
+
 defaults:
   - logging: default
-  - model: clamp-lite 
+  - model: clac-lite 
   - trainer: default
-
+  - llm: galactica-125m

@@ -1,4 +1,6 @@
+name: cgcnn
 _target_: model.graph_encoder.CGCNN
+_type: torch_geometric
 orig_atom_fea_len: 92
 nbr_fea_len: 80
 atom_fea_len: 1024

@@ -1,0 +1,34 @@
+# Graph encoder - should match the pretrained model architecture
+defaults:
+  - graph_encoder: painn  # Must match the architecture in fine_tune_from checkpoint
+  - optimizer: adamw
+  - scheduler: plateau
+
+_target_: model.clac.GraphSupervisedLearning
+
+# Pretrained checkpoint loading
+fine_tune_from: null  # Path to pretrained CLaC or SSL checkpoint (e.g., /path/to/checkpoint.ckpt)
+base_model_type: clac  # 'clac' or 'ssl' - which model type to load from
+strict_loading: false  # Set to false if loading partial weights or mismatched architectures
+
+# Graph encoder freezing options
+freeze_graph_encoder: false  # Set to true to freeze all graph encoder parameters
+freeze_layers: null  # List of layer indices/names to freeze
+                     # Examples:
+                     # CGCNN: [0, 1] freezes convs[0], convs[1], or ['embedding', 0]
+                     # PaiNN: [0, 1] freezes list_message[0], list_update[0], etc., or ['embedding', 0]
+                     # ORB: [0, 1] freezes gnn_stacks[0], gnn_stacks[1], or ['atom_emb', 0, 'conditioner']
+
+# Model architecture
+num_classes: 1  # Will be overridden by datamodule if classification task
+
+# DataModule configuration
+datamodule:
+  _target_: data.datamodule.GraphSupervisedDataModule
+  data_path: /home/lucky/Projects/CLaC-revision/datafiles/jarvis_dft_3d_2021
+  batch_size: ${hyperparams.batch_size}
+  num_workers: ${hyperparams.num_workers}
+  graphdatatype: torch_geometric  # 'torch_geometric' or 'orb'
+  label: "band gap (eV)"  # Target property column name
+  task: regression  # 'regression' or 'classification'
+  debug: ${debug}

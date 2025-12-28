@@ -1,18 +1,29 @@
 # Environment variables
 .env
 
-# Logs
+# Logs and outputs
 lightning_logs
-outputs
-logs
+outputs/
+logs/
 *.out
-__pycache__
-wandb
-pretrained_model
-supervised_ckpt
+*.log
+wandb/
+CLAUDE.md
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+evaluation/__pycache__/
+tools/__pycache__/
+embeddings_cache.pt
+
+# Model checkpoints (keep outputs/ for experiments)
+pretrained_model/
+supervised_ckpt/
 
 # Notebooks
-# *.ipynb
+*.ipynb
 liquid_electrolytes.txt
 data/preprocess.ipynb
 ## Data
@@ -20,3 +31,6 @@ data/preprocess.ipynb
 *_data.json
 jsons
 *.json
+
+tex
+compute_metrics_dual.py

@@ -1,0 +1,5 @@
+name: infonce
+_target_: model.clac.InfoNCELoss
+temperature: 0.07
+visual_self_supervised: ${..use_visual_intramodal_loss}
+textual_self_supervised: ${..use_textual_intramodal_loss}

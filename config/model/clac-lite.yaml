@@ -1,0 +1,32 @@
+_target_: model.clac.CLaCLite
+# Intramodal loss configuration (fine-grained control for ablation studies)
+# Inherited from hyperparams for consistency
+use_visual_intramodal_loss: ${hyperparams.use_visual_intramodal_loss}   # Graph-graph contrastive learning
+use_textual_intramodal_loss: ${hyperparams.use_textual_intramodal_loss} # Text-text contrastive learning
+
+datamodule:
+  _target_: data.datamodule.CLaCDataModule
+  data_path: ${paths.data}
+  batch_size: ${hyperparams.batch_size}
+  num_workers: ${hyperparams.num_workers}
+  tokenizer_model: ${llm.path}
+  graphdatatype: ${..graph_encoder._type}  # 'torch_geometric' or 'orb'
+  debug: ${debug}
+  textdatatype: papers # narratives, papers
+  sentencewise: True
+  # Inherit from parent model config to ensure consistency
+  use_visual_intramodal_loss: ${..use_visual_intramodal_loss}
+  use_textual_intramodal_loss: ${..use_textual_intramodal_loss}
+  # Chemical formula replacement (controlled manually during training)
+  replace_formula_prob: ${hyperparams.replace_formula_prob}
+
+augmentation: True
+lm_weight: 0.  # Language model loss weight (MLM for encoder, CLM for decoder)
+
+emb_dim: ${hyperparams.emb_dim}
+defaults:
+  - graph_encoder: painn
+  - optimizer: adamw
+  - scheduler: cosine
+  - text_augmentation: token_random_masking
+  - loss: infonce

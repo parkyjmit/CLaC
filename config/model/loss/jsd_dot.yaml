@@ -1,0 +1,10 @@
+name: jsd_dot
+_target_: model.clac.JSDInfoMaxLoss
+# image_dim and text_dim are injected from code for correctness
+type: dot
+prior_weight: 0.1
+image_prior: true
+text_prior: true
+visual_self_supervised: ${..use_visual_intramodal_loss}
+textual_self_supervised: ${..use_textual_intramodal_loss}
+

@@ -6,21 +6,23 @@ random_seed: 42
 
 pl_trainer:
   accelerator: gpu
-  devices: 6,7,8,9
+  devices: 2
   strategy: ddp
   precision: bf16-mixed
-  # max_steps: 10000
-  max_epochs: 100
-  accumulate_grad_batches: 8
+  # max_steps: 50000
+  max_epochs: 5
+  accumulate_grad_batches: 16
   gradient_clip_val: 0.05  # 0.0005
+  log_every_n_steps: 1
 
 monitor_metric: 'val_loss'  # 'val_acc_top1', 'val_loss'
 monitor_metric_mode: 'min'
 
 early_stopping:
-  patience: 300
-  verbose: False
+  patience: 30000
+  verbose: false
 
 model_checkpoints:
   save_top_k: 2
   verbose: False
+  save_last: True

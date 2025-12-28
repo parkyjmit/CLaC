@@ -1,0 +1,8 @@
+_target_: model.clac.JSDInfoMaxLoss
+type: dot
+prior_weight: 0.1
+image_prior: false
+text_prior: true
+visual_self_supervised: ${..use_visual_intramodal_loss}
+textual_self_supervised: ${..use_textual_intramodal_loss}
+

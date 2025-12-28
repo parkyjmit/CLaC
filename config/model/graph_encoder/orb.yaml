@@ -1,0 +1,4 @@
+name: orb
+_target_: model.graph_encoder.ORB
+_type: orb
+out_dim: 256

@@ -2,8 +2,8 @@
 import requests
 import pandas as pd
 import numpy as np
-from jarvis.core.atoms import Atoms
-from jarvis.core.graphs import Graph
+# from jarvis.core.atoms import Atoms
+# from jarvis.core.graphs import Graph
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
@@ -180,33 +180,33 @@ def search_mat_in_paper_return_paragraphs(paper_df, mat, paper_max=10):
     return text_series, doi_series
 
 
-def jarvis_atoms2graph(input_item):
-    '''
-    input: pandas dataframe rows
-    output: graph in dict format
+# def jarvis_atoms2graph(input_item):
+#     '''
+#     input: pandas dataframe rows
+#     output: graph in dict format
 
-    Convert atoms column in parquet file to graphs
-    Graphs contain
-        edge_index: list of two lists of int
-        edge_attr: list of float
-        num_nodes: int
-        node_feat: list of list of float
-        y: list of int
-    '''
-    if 'atoms' in input_item.keys():
-        jatoms = Atoms.from_dict(input_item['atoms'])
-    elif 'cif' in input_item.keys():
-        with open('temp.cif', 'w') as f:
-            f.write(input_item['cif'])
-        jatoms = Atoms.from_cif('temp.cif')
-    dglgraph = Graph.atom_dgl_multigraph(jatoms, compute_line_graph=False, atom_features='cgcnn')
-    item = {}
-    edges = dglgraph.edges()
-    item['edge_index'] = [edges[0].tolist(), edges[1].tolist()]
-    item['edge_attr'] = dglgraph.edata['r'].tolist()
-    item['node_feat'] = dglgraph.ndata['atom_features'].tolist()
-    item['y'] = [0]
-    return item
+#     Convert atoms column in parquet file to graphs
+#     Graphs contain
+#         edge_index: list of two lists of int
+#         edge_attr: list of float
+#         num_nodes: int
+#         node_feat: list of list of float
+#         y: list of int
+#     '''
+#     if 'atoms' in input_item.keys():
+#         jatoms = Atoms.from_dict(input_item['atoms'])
+#     elif 'cif' in input_item.keys():
+#         with open('temp.cif', 'w') as f:
+#             f.write(input_item['cif'])
+#         jatoms = Atoms.from_cif('temp.cif')
+#     dglgraph = Graph.atom_dgl_multigraph(jatoms, compute_line_graph=False, atom_features='cgcnn')
+#     item = {}
+#     edges = dglgraph.edges()
+#     item['edge_index'] = [edges[0].tolist(), edges[1].tolist()]
+#     item['edge_attr'] = dglgraph.edata['r'].tolist()
+#     item['node_feat'] = dglgraph.ndata['atom_features'].tolist()
+#     item['y'] = [0]
+#     return item
 
 
 def json_atoms_to_graphs(json_file):

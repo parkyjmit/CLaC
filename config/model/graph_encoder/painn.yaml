@@ -1,7 +1,9 @@
+name: painn
 _target_: model.graph_encoder.PaiNN
+_type: torch_geometric
 orig_atom_fea_len: 92
-num_feat: 1024
+num_feat: 512
 out_dim: 512
 cut_off: 5.0
 n_rbf: 20
-num_interactions: 3
+num_interactions: 5
