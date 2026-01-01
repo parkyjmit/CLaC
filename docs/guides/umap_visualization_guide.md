@@ -463,7 +463,7 @@ python evaluation/visualize_embeddings.py \
   --data-path datafiles/mp_3d_2020_gpt_narratives \
   --color-by property --property-name density \
   --cmap YlOrRd
-
+ 
 # Example 4: Text query similarity - find semiconductors
 python evaluation/visualize_embeddings.py \
   --checkpoint outputs/your-model/checkpoint.ckpt \

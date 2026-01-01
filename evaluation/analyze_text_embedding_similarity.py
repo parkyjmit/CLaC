@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import argparse
+import json
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -930,6 +931,42 @@ def plot_all_in_one(results, output_dir, reference_value=None):
     plt.close()
 
 
+def save_results_to_json(results, output_dir, property_name):
+    """
+    Save similarity analysis results to JSON file.
+
+    Args:
+        results: Dictionary from analyze_property_similarity or analyze_threshold_similarity
+        output_dir: Directory to save JSON file
+        property_name: Property name for filename
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    property_safe = property_name.replace(' ', '_')
+
+    # Convert numpy arrays to lists for JSON serialization
+    json_results = {}
+    for key, value in results.items():
+        if isinstance(value, np.ndarray):
+            json_results[key] = value.tolist()
+        else:
+            json_results[key] = value
+
+    # Determine filename based on analysis type
+    if 'threshold_mode' in results:
+        # Threshold analysis
+        output_file = output_dir / f'threshold_similarity_{property_safe}.json'
+    else:
+        # Standard pairwise analysis
+        output_file = output_dir / f'similarity_analysis_{property_safe}.json'
+
+    with open(output_file, 'w') as f:
+        json.dump(json_results, f, indent=2)
+
+    print(f"[Save] Results saved to {output_file}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Analyze text embedding similarity for different property values'
@@ -1066,8 +1103,12 @@ def main():
             use_projection=use_projection
         )
 
+        # Save results to JSON
+        print("\n[Step 4] Saving results to JSON...")
+        save_results_to_json(threshold_results, args.output_dir, args.property)
+
         # Generate plots
-        print("\n[Step 4] Generating threshold analysis plots...")
+        print("\n[Step 5] Generating threshold analysis plots...")
         plot_threshold_analysis(threshold_results, args.output_dir)
 
     else:
@@ -1080,8 +1121,12 @@ def main():
         print(f"[Step 3] Min similarity:  {results['similarity_matrix'].min():.4f}")
         print(f"[Step 3] Max similarity:  {results['similarity_matrix'].max():.4f}")
 
+        # Save results to JSON
+        print("\n[Step 4] Saving results to JSON...")
+        save_results_to_json(results, args.output_dir, args.property)
+
         # Generate plots
-        print("\n[Step 4] Generating plots...")
+        print("\n[Step 5] Generating plots...")
         plot_all_in_one(results, args.output_dir, args.reference_value)
 
     print("\n" + "="*80)

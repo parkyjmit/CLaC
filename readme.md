@@ -40,6 +40,37 @@ CLaC-revision/
 ├── sweep.yaml               # Hyperparameter sweep configuration
 └── readme.md                # This file
 ```
+  ## System Requirements
+
+  ### Software Dependencies
+  - **Operating System**: Linux (tested on Ubuntu 20.04, 22.04), macOS (experimental support)
+  - **Python**: 3.10, 3.11 (tested on 3.10.12, 3.11.5)
+  - **CUDA**: 12.1 or 12.6 (tested on 12.1, 12.6)
+  - **PyTorch**: 2.8.0
+  - **PyTorch Geometric**: 2.6.1
+  - **Core Dependencies**:
+    - `orb-models==0.5.5` (Crystal graph neural network encoder)
+    - `jarvis-tools` (Materials science utilities)
+    - `transformers` (Hugging Face transformers for text encoding)
+    - `lightning` (PyTorch Lightning for training)
+    - `hydra-core` (Configuration management)
+    - `wandb` (Experiment tracking)
+    - `spacy` (Text processing, requires `en_core_web_sm` model)
+    - `umap-learn` (Dimensionality reduction for visualization)
+    - `matplotlib`, `scikit-learn`, `scipy`, `pandas`, `python-dotenv`
+
+  ### Hardware Requirements
+  - **GPU**: NVIDIA GPU with 16GB+ VRAM recommended (tested on NVIDIA A100 40GB, RTX 3090 24GB, V100 32GB)
+    - Minimum: NVIDIA GPU with 12GB VRAM (training with smaller batch sizes)
+    - For inference/evaluation only: 8GB VRAM sufficient
+  - **RAM**: 32GB+ system RAM recommended (minimum 16GB)
+  - **Storage**: 50GB+ free disk space (for dataset, model checkpoints, and outputs)
+  - **CPU**: Multi-core processor (8+ cores recommended for data loading)
+
+  ### Tested Configurations
+  The software has been successfully tested on:
+  - Ubuntu 22.04 LTS + CUDA 12.6 + PyTorch 2.8.0 + NVIDIA A6000 (48GB)
+  - Ubuntu 22.04 LTS + CUDA 12.1 + PyTorch 2.8.0 + NVIDIA RTX 3090 (24GB)
 
 ## Installation
 
@@ -48,7 +79,7 @@ CLaC-revision/
 - CUDA 12.6 (or adjust installation commands for your CUDA version)
 - Conda or Miniconda
 
-### Step-by-Step Installation
+### Method 1: Step-by-Step Installation (Recommended)
 
 **1. Create and activate conda environment:**
 ```bash
@@ -62,53 +93,48 @@ conda activate clac
 pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu126
 
 # For CUDA 12.1
-# pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu121
+pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu121
 ```
 
 **3. Install PyTorch Geometric and extensions:**
 ```bash
 # For CUDA 12.6
 pip install torch-geometric==2.6.1
-pip install pyg-lib torch-scatter torch-sparse torch-cluster torch-spline_conv \
+pip install pyg-lib torch-scatter torch-sparse torch-cluster torch-spline-conv \
     -f https://data.pyg.org/whl/torch-2.8.0+cu126.html
 
 # For CUDA 12.1, use: torch-2.8.0+cu121.html
 ```
 
-**4. Install materials science packages:**
+**4. Install all remaining dependencies:**
 ```bash
-pip install orb-models==0.5.5 jarvis-tools
+pip install -r requirements.txt
 ```
 
-**5. Install remaining dependencies:**
+**5. Download spaCy language model:**
 ```bash
-pip install transformers datasets spacy hydra-core lightning wandb umap-learn
 python -m spacy download en_core_web_sm
 ```
 
-**6. Install additional scientific packages:**
-```bash
-pip install matplotlib scikit-learn scipy pandas python-dotenv
-```
+### Method 2: Using environment.yml (Alternative)
 
-### Alternative Installation Methods
-
-**Option A: Using environment.yml (Quick Setup)**
 ```bash
 conda env create -f environment.yml
 conda activate clac
+
+# Install PyTorch with CUDA support
+pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu126
+
+# Install PyTorch Geometric and extensions
+pip install torch-geometric==2.6.1
+pip install pyg-lib torch-scatter torch-sparse torch-cluster torch-spline-conv \
+    -f https://data.pyg.org/whl/torch-2.8.0+cu126.html
+
+# Download spaCy language model
 python -m spacy download en_core_web_sm
 ```
 
-**Option B: Using requirements.txt**
-
-After installing PyTorch and PyTorch Geometric (steps 2-3 above), you can install other dependencies:
-```bash
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm
-```
-
-**Note:** PyTorch and PyTorch Geometric must be installed separately with the correct CUDA version before using requirements.txt.
+**Note:** Both PyTorch and PyTorch Geometric require CUDA-specific wheels, so they must be installed separately with the correct CUDA version. The requirements.txt and environment.yml include all other dependencies.
 
 ### Verify Installation
 
@@ -127,6 +153,21 @@ python -c "import torch; import torch_geometric; import orb_models; print('✓ I
 - Ensure PyTorch is installed first
 - Use the correct wheel URL for your CUDA version
 - See [PyG installation guide](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html)
+
+**Package conflicts:**
+- If you encounter dependency conflicts, create a fresh conda environment
+- Ensure you follow the installation order: PyTorch → PyTorch Geometric → other packages
+
+### Installation Time
+- **Method 1 (Step-by-step)**: Approximately 15-30 minutes on a standard desktop computer with good internet connection
+  - Conda environment creation: 1-2 minutes
+  - PyTorch installation: 5-10 minutes (depending on internet speed)
+  - PyTorch Geometric and extensions: 5-10 minutes
+  - Remaining dependencies: 5-10 minutes
+- **Method 2 (environment.yml)**: Approximately 20-40 minutes (conda resolves all dependencies automatically)
+
+**Note**: Installation time may vary depending on internet connection speed and system specifications.
+
 
 ## Dataset
 ### Data configuration
@@ -175,6 +216,7 @@ See `yaml` files in `config` section. If you want to change training configurati
 ### Run pretraining
 Training code is based on pytorch lightning and hydra configuration.
 To pretrain the CLaC model, run `python train.py` with appropriate configuration.
+On 4x NVIDIA A6000 GPUs, training for 5 epochs takes approximately 24 hours.
 
 ### Advanced Features
 

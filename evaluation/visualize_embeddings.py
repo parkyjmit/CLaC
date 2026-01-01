@@ -19,6 +19,7 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import re
 
 import seaborn as sns
 from tqdm import tqdm
@@ -44,6 +45,38 @@ mpl.rcParams["svg.fonttype"] = "none"
 # For PDF
 mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"]  = 42
+
+def sanitize_property_name_for_filename(property_name):
+    """
+    Convert property name to safe filename by removing units and special characters.
+
+    Examples:
+        'density (g/cm³)' -> 'density'
+        'band gap' -> 'band_gap'
+        'formation energy per atom' -> 'formation_energy_per_atom'
+
+    Args:
+        property_name: Original property name with potential units and spaces
+
+    Returns:
+        Sanitized property name safe for use in filenames
+    """
+    # Remove units in parentheses: "density (g/cm³)" -> "density"
+    name = re.sub(r'\s*\([^)]*\)', '', property_name)
+
+    # Replace spaces with underscores: "band gap" -> "band_gap"
+    name = name.replace(' ', '_')
+
+    # Remove any remaining special characters except underscores
+    name = re.sub(r'[^a-zA-Z0-9_]', '', name)
+
+    # Replace multiple underscores with single underscore
+    name = re.sub(r'_+', '_', name)
+
+    # Remove leading/trailing underscores
+    name = name.strip('_')
+
+    return name
 
 def save_embeddings_cache(cache_path, embeddings_dict):
     """Save embeddings to cache file."""
@@ -77,7 +110,7 @@ def extract_embeddings(model, dataloader, device, embed_type='both', use_project
     Args:
         model: Trained CLaC model
         dataloader: DataLoader for the dataset
-        device: Device to run inference on
+        device: Device to run inference on (str or torch.device)
         embed_type: 'graph', 'text', or 'both'
         use_projection: If True, use loss.global_d projection blocks to map to common space
 
@@ -88,6 +121,10 @@ def extract_embeddings(model, dataloader, device, embed_type='both', use_project
 
     graph_embeddings = []
     text_embeddings = []
+
+    # Convert to torch.device if string
+    if isinstance(device, str):
+        device = torch.device(device)
 
     # Check if model has global_d for projection
     has_global_d = hasattr(model, 'loss') and hasattr(model.loss, 'global_d')
@@ -110,6 +147,7 @@ def extract_embeddings(model, dataloader, device, embed_type='both', use_project
                     g_feat = F.normalize(g_feat, dim=-1)
 
                 graph_embeddings.append(g_feat.cpu().numpy())
+                del g_feat  # Free GPU memory
 
             if embed_type in ['text', 'both']:
                 # Extract text embeddings using the model's encode_text method
@@ -123,6 +161,12 @@ def extract_embeddings(model, dataloader, device, embed_type='both', use_project
                     t_feat = F.normalize(t_feat, dim=-1)
 
                 text_embeddings.append(t_feat.cpu().numpy())
+                del t_feat  # Free GPU memory
+
+            # Free batch data from GPU
+            del graphs, texts
+            if device.type == 'cuda':
+                torch.cuda.empty_cache()
 
     result = {}
     if embed_type in ['graph', 'both']:
@@ -209,7 +253,7 @@ def compute_text_similarity(model, text_query, embeddings, device, datamodule, u
         model: CLaC model with text encoder
         text_query: Text query string
         embeddings: (N, D) array of embeddings to compare against
-        device: Device to run on
+        device: Device to run on (str or torch.device)
         datamodule: CLaCDataModule instance (for tokenizer)
         use_projection: Whether to use projection block
 
@@ -217,6 +261,10 @@ def compute_text_similarity(model, text_query, embeddings, device, datamodule, u
         (N,) array of cosine similarities
     """
     model.eval()
+
+    # Convert to torch.device if string
+    if isinstance(device, str):
+        device = torch.device(device)
 
     # Use DataModule's tokenizer directly
     tokenized = datamodule.token_fn(text_query)
@@ -240,6 +288,11 @@ def compute_text_similarity(model, text_query, embeddings, device, datamodule, u
 
         query_feat = F.normalize(query_feat, dim=-1)
         query_feat = query_feat.cpu().numpy()
+
+    # Free GPU memory
+    del inputs
+    if device.type == 'cuda':
+        torch.cuda.empty_cache()
 
     # Compute cosine similarity
     # embeddings is (N, D), query_feat is (1, D)
@@ -340,6 +393,7 @@ def main():
     parser.add_argument('--embed-type', type=str, choices=['graph', 'text', 'both'], default='both',
                        help='Which embeddings to visualize')
     parser.add_argument('--batch-size', type=int, default=32, help='Batch size for inference')
+    parser.add_argument('--num-workers', type=int, default=4, help='Number of dataloader workers')
     parser.add_argument('--device', type=str, default='cuda:0', help='Device to use')
     parser.add_argument('--split', type=str, default='test', choices=['train', 'val', 'test'],
                        help='Dataset split to use')
@@ -393,7 +447,13 @@ def main():
     # Load model
     if args.checkpoint is not None:
         print(f"Loading model from checkpoint: {args.checkpoint}")
-        model = CLaCLite.load_from_checkpoint(args.checkpoint, strict=False)
+        print(f"Loading directly to device: {args.device}")
+        # Load checkpoint directly to target device to avoid GPU 0 memory allocation
+        model = CLaCLite.load_from_checkpoint(
+            args.checkpoint,
+            map_location=args.device,
+            strict=False
+        )
         tokenizer_model = model.hparams.datamodule.tokenizer_model
     else:
         print(f"Initializing model from config: {args.config}")
@@ -475,7 +535,7 @@ def main():
     dm = CLaCDataModule(
         data_path=args.data_path,
         batch_size=args.batch_size,
-        num_workers=4,
+        num_workers=args.num_workers,
         graphdatatype=graphdatatype,
         tokenizer_model=tokenizer_model,
         debug=False,
@@ -562,6 +622,9 @@ def main():
         print(f"Coloring by property: {args.property_name}...")
         property_values = get_property_values(dataset, args.property_name)
 
+        # Create safe filename from property name (remove units and special chars)
+        safe_property_name = sanitize_property_name_for_filename(args.property_name)
+
         if args.embed_type == 'both':
             # Duplicate property values for text embeddings
             property_values = np.concatenate([property_values, property_values])
@@ -569,7 +632,7 @@ def main():
         plot_embeddings(coords, property_values,
                       title=f'UMAP: Colored by {args.property_name}',
                       colorbar_label=args.property_name,
-                      save_path=output_dir / f'umap_{args.split}_property_{args.property_name}.svg',
+                      save_path=output_dir / f'umap_{args.split}_property_{safe_property_name}.svg',
                       cmap=args.cmap, discrete=False, alpha=args.alpha)
 
         # Also create separate plots for graph and text if both exist
@@ -579,7 +642,7 @@ def main():
             plot_embeddings(coords[graph_mask], property_values[graph_mask],
                           title=f'UMAP (Graph): Colored by {args.property_name}',
                           colorbar_label=args.property_name,
-                          save_path=output_dir / f'umap_{args.split}_graph_property_{args.property_name}.svg',
+                          save_path=output_dir / f'umap_{args.split}_graph_property_{safe_property_name}.svg',
                           cmap=args.cmap, discrete=False, alpha=args.alpha)
 
             # Text only
@@ -587,7 +650,7 @@ def main():
             plot_embeddings(coords[text_mask], property_values[text_mask],
                           title=f'UMAP (Text): Colored by {args.property_name}',
                           colorbar_label=args.property_name,
-                          save_path=output_dir / f'umap_{args.split}_text_property_{args.property_name}.svg',
+                          save_path=output_dir / f'umap_{args.split}_text_property_{safe_property_name}.svg',
                           cmap=args.cmap, discrete=False, alpha=args.alpha)
 
     elif args.color_by == 'keyword':
@@ -639,7 +702,7 @@ def main():
                       title=f'UMAP: Similarity to "{args.text_query}"',
                       colorbar_label='Cosine Similarity',
                       save_path=output_dir / f'umap_{args.split}_text_similarity_{query_safe}.svg',
-                      cmap='coolwarm', discrete=False, alpha=args.alpha,
+                      cmap=args.cmap, discrete=False, alpha=args.alpha,
                       vmin=args.vmin, vmax=args.vmax, symmetric_colormap=True)
 
         # Also create separate plots for graph and text if both exist
@@ -649,7 +712,7 @@ def main():
                           title=f'UMAP (Graph): Similarity to "{args.text_query}"',
                           colorbar_label='Cosine Similarity',
                           save_path=output_dir / f'umap_{args.split}_graph_text_similarity_{query_safe}.svg',
-                          cmap='coolwarm', discrete=False, alpha=args.alpha,
+                          cmap=args.cmap, discrete=False, alpha=args.alpha,
                           vmin=args.vmin, vmax=args.vmax, symmetric_colormap=True)
 
             text_mask = modality_labels == 'Text'
@@ -657,7 +720,7 @@ def main():
                           title=f'UMAP (Text): Similarity to "{args.text_query}"',
                           colorbar_label='Cosine Similarity',
                           save_path=output_dir / f'umap_{args.split}_text_text_similarity_{query_safe}.svg',
-                          cmap='coolwarm', discrete=False, alpha=args.alpha,
+                          cmap=args.cmap, discrete=False, alpha=args.alpha,
                           vmin=args.vmin, vmax=args.vmax, symmetric_colormap=True)
 
         # Print statistics
@@ -685,14 +748,60 @@ def main():
             'min_dist': args.min_dist,
             'metric': args.metric,
             'random_state': args.random_seed,
-        }
+        },
+        'color_by': args.color_by,
     }
 
     if args.embed_type == 'both':
         save_data['modality_labels'] = modality_labels.tolist()
 
-    with open(output_dir / f'umap_{args.split}_data.json', 'w') as f:
+    # Save color data based on color_by mode
+    if args.color_by == 'modality':
+        if args.embed_type == 'both':
+            save_data['colors'] = (modality_labels == 'Graph').astype(int).tolist()
+            save_data['color_labels'] = ['Text', 'Graph']
+
+    elif args.color_by == 'property':
+        save_data['property_name'] = args.property_name
+        save_data['property_values'] = property_values.tolist()
+        save_data['colors'] = property_values.tolist()
+
+    elif args.color_by == 'keyword':
+        save_data['keywords'] = args.keywords
+        save_data['keyword_presence'] = keyword_presence.tolist()
+        save_data['colors'] = keyword_presence.astype(int).tolist()
+        save_data['color_labels'] = ['Without keywords', 'With keywords']
+
+    elif args.color_by == 'text-similarity':
+        save_data['text_query'] = args.text_query
+        save_data['similarities'] = similarities.tolist()
+        save_data['colors'] = similarities.tolist()
+        save_data['similarity_stats'] = {
+            'mean': float(similarities.mean()),
+            'std': float(similarities.std()),
+            'min': float(similarities.min()),
+            'max': float(similarities.max()),
+        }
+
+    # Determine JSON filename based on color_by mode (match SVG naming)
+    if args.color_by == 'modality':
+        json_filename = f'umap_{args.split}_modality.json'
+    elif args.color_by == 'property':
+        safe_property_name = sanitize_property_name_for_filename(args.property_name)
+        json_filename = f'umap_{args.split}_property_{safe_property_name}.json'
+    elif args.color_by == 'keyword':
+        keywords_str = '_'.join(args.keywords)
+        json_filename = f'umap_{args.split}_keyword_{keywords_str}.json'
+    elif args.color_by == 'text-similarity':
+        query_safe = args.text_query.replace(' ', '_').replace('/', '_')[:50]
+        json_filename = f'umap_{args.split}_text_similarity_{query_safe}.json'
+    else:
+        json_filename = f'umap_{args.split}_data.json'
+
+    with open(output_dir / json_filename, 'w') as f:
         json.dump(save_data, f, indent=2)
+
+    print(f"Saved visualization data to {output_dir / json_filename}")
 
     print(f"\nVisualization complete! Results saved to {output_dir}")
 

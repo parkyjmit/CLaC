@@ -787,19 +787,9 @@ class QuestionEvaluationDataModule(CLaCBaseDataModule):
         for key in encoded_per_example[0].keys():
             stacked_batch[key] = torch.stack([encoded[key] for encoded in encoded_per_example], dim=0)
 
-        def _argmax_index(target):
-            if isinstance(target, torch.Tensor):
-                target_list = target.view(-1).tolist()
-            elif isinstance(target, list):
-                if target and isinstance(target[0], list):
-                    target_list = target[0]
-                else:
-                    target_list = target
-            else:
-                raise TypeError(f"Unsupported label type: {type(target)}")
-            return max(range(len(target_list)), key=lambda idx: target_list[idx])
-
-        labels = torch.tensor([_argmax_index(f['y']) for f in features], dtype=torch.long)
+        # For zero-shot QA: the correct answer is always the first choice (index 0)
+        # No need to use _argmax_index since the answer is always 0
+        labels = torch.zeros(len(features), dtype=torch.long)
         choice_sizes = torch.tensor([encoded['input_ids'].size(0) for encoded in encoded_per_example], dtype=torch.long)
 
         stacked_batch['labels'] = labels

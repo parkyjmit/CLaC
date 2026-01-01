@@ -64,10 +64,18 @@ python evaluation/analyze_text_embedding_similarity.py \
 **Note:** Grid spacing is automatically determined per property to ensure clean reference values (e.g., 1.0, 2.0, 3.0) are exactly on grid points. The `--n-values` parameter has been removed in favor of this automatic spacing.
 
 **Output:**
-- Standard mode: `similarity_analysis_<property>.png/svg`
-- Threshold mode: `threshold_analysis_<property>_<mode>_<threshold>.png/svg`
+- Standard mode:
+  - Plots: `similarity_analysis_<property>.png/svg`
+  - Data: `similarity_analysis_<property>.json`
+- Threshold mode:
+  - Plots: `threshold_analysis_<property>_<mode>_<threshold>.png/svg`
+  - Data: `threshold_similarity_<property>.json`
 
-### 2. `scripts/visualization/run_text_embedding_analysis.sh`
+**JSON Output Contents:**
+- Standard mode: Contains `values`, `embeddings`, `similarity_matrix`, `property_name`, `unit`
+- Threshold mode: Contains `values`, `similarities`, `threshold_value`, `threshold_mode`, `threshold_text`, `above_mask`, `below_mask`, `above_similarities`, `below_similarities`
+
+### 2. `scripts/evaluation/run_text_embedding_analysis.sh`
 
 Batch script to analyze all 6 properties automatically.
 
@@ -75,19 +83,19 @@ Batch script to analyze all 6 properties automatically.
 
 ```bash
 # Trained model (default usage)
-bash scripts/visualization/run_text_embedding_analysis.sh
+bash scripts/evaluation/run_text_embedding_analysis.sh
 
 # Trained model with custom checkpoint
-bash scripts/visualization/run_text_embedding_analysis.sh outputs/your-model/checkpoint.ckpt
+bash scripts/evaluation/run_text_embedding_analysis.sh outputs/your-model/checkpoint.ckpt
 
 # Trained model with custom checkpoint and device
-bash scripts/visualization/run_text_embedding_analysis.sh outputs/your-model/checkpoint.ckpt cuda:7
+bash scripts/evaluation/run_text_embedding_analysis.sh outputs/your-model/checkpoint.ckpt cuda:7
 
 # Untrained model (baseline comparison)
-bash scripts/visualization/run_text_embedding_analysis.sh untrained cuda:0
+bash scripts/evaluation/run_text_embedding_analysis.sh untrained cuda:0
 
 # Untrained model with custom config
-bash scripts/visualization/run_text_embedding_analysis.sh untrained cuda:0 config/model/clac-lite.yaml
+bash scripts/evaluation/run_text_embedding_analysis.sh untrained cuda:0 config/model/clac-lite.yaml
 ```
 
 **Output Directory Structure:**
@@ -133,12 +141,12 @@ python evaluation/analyze_text_embedding_similarity.py \
 
 ```bash
 # Run all properties with trained model
-bash scripts/visualization/run_text_embedding_analysis.sh \
+bash scripts/evaluation/run_text_embedding_analysis.sh \
     outputs/your-model/checkpoint.ckpt \
     cuda:7
 
 # Run all properties with untrained model (baseline)
-bash scripts/visualization/run_text_embedding_analysis.sh untrained cuda:0
+bash scripts/evaluation/run_text_embedding_analysis.sh untrained cuda:0
 ```
 
 This will generate 6 plots (one for each property) in the respective directories:
@@ -163,7 +171,7 @@ python evaluation/analyze_text_embedding_similarity.py \
     --device cuda:0
 
 # Run all predefined threshold tests
-bash scripts/visualization/run_threshold_embedding_analysis.sh outputs/model.ckpt cuda:0
+bash scripts/evaluation/run_threshold_embedding_analysis.sh outputs/model.ckpt cuda:0
 ```
 
 This analyzes whether the model understands inequality constraints and can distinguish values satisfying vs. not satisfying a condition.
@@ -231,7 +239,7 @@ The generated figures are publication-ready (300 DPI, vector graphics available)
 
 ### Custom Property Ranges
 
-Edit the property configuration in `scripts/visualization/run_text_embedding_analysis.sh`:
+Edit the property configuration in `scripts/evaluation/run_text_embedding_analysis.sh`:
 
 ```bash
 PROPERTIES=(
@@ -262,11 +270,11 @@ Compare trained model against untrained baseline:
 
 ```bash
 # Step 1: Analyze untrained model (baseline)
-bash scripts/visualization/run_text_embedding_analysis.sh untrained cuda:0
+bash scripts/evaluation/run_text_embedding_analysis.sh untrained cuda:0
 # Results saved to: outputs/text_embedding_similarity/untrained/
 
 # Step 2: Analyze trained model
-bash scripts/visualization/run_text_embedding_analysis.sh outputs/your-model/checkpoint.ckpt cuda:0
+bash scripts/evaluation/run_text_embedding_analysis.sh outputs/your-model/checkpoint.ckpt cuda:0
 # Results saved to: outputs/text_embedding_similarity/your-model/
 
 # Step 3: Compare results visually
@@ -287,15 +295,80 @@ Run the analysis for different models and compare results:
 
 ```bash
 # Model 1
-bash scripts/visualization/run_text_embedding_analysis.sh outputs/model1/checkpoint.ckpt cuda:0
+bash scripts/evaluation/run_text_embedding_analysis.sh outputs/model1/checkpoint.ckpt cuda:0
 # Results in: outputs/text_embedding_similarity/model1/
 
 # Model 2
-bash scripts/visualization/run_text_embedding_analysis.sh outputs/model2/checkpoint.ckpt cuda:0
+bash scripts/evaluation/run_text_embedding_analysis.sh outputs/model2/checkpoint.ckpt cuda:0
 # Results in: outputs/text_embedding_similarity/model2/
 
 # Note: Each model's results are automatically saved to separate directories
 ```
+
+### Using JSON Output for Custom Plotting
+
+All analysis results are automatically saved to JSON files for programmatic access:
+
+```python
+import json
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Load standard similarity analysis
+with open('outputs/text_embedding_similarity/my-model/similarity_analysis_band_gap.json', 'r') as f:
+    data = json.load(f)
+
+values = np.array(data['values'])
+similarity_matrix = np.array(data['similarity_matrix'])
+property_name = data['property_name']
+unit = data['unit']
+
+# Custom plotting example: Extract diagonal similarities
+diagonal_sims = np.diag(similarity_matrix, k=1)  # Similarity to next value
+plt.plot(values[:-1], diagonal_sims)
+plt.xlabel(f'{property_name} ({unit})')
+plt.ylabel('Similarity to next value')
+plt.title('Sequential Value Similarity')
+plt.savefig('custom_analysis.png')
+```
+
+**Threshold analysis JSON:**
+```python
+# Load threshold similarity analysis
+with open('outputs/text_embedding_similarity/my-model/threshold_similarity_band_gap.json', 'r') as f:
+    data = json.load(f)
+
+values = np.array(data['values'])
+similarities = np.array(data['similarities'])
+above_mask = np.array(data['above_mask'])
+threshold_value = data['threshold_value']
+
+# Custom analysis: Compare distributions
+satisfying = similarities[above_mask]
+not_satisfying = similarities[~above_mask]
+print(f"Mean similarity for values > {threshold_value}: {satisfying.mean():.3f}")
+print(f"Mean similarity for values <= {threshold_value}: {not_satisfying.mean():.3f}")
+```
+
+**JSON Fields Reference:**
+
+Standard mode (`similarity_analysis_<property>.json`):
+- `values`: Array of property values tested
+- `embeddings`: Text embeddings (N × embedding_dim)
+- `similarity_matrix`: Pairwise cosine similarities (N × N)
+- `property_name`: Property name string
+- `unit`: Property unit string
+
+Threshold mode (`threshold_similarity_<property>.json`):
+- `values`: Array of property values tested
+- `similarities`: Similarity to threshold query (length N)
+- `threshold_value`: Threshold value used
+- `threshold_mode`: Mode (e.g., "greater_than")
+- `threshold_text`: Human-readable query text
+- `above_mask`: Boolean mask for values satisfying condition
+- `below_mask`: Boolean mask for values not satisfying condition
+- `above_similarities`: Similarities for satisfying values
+- `below_similarities`: Similarities for non-satisfying values
 
 ## Troubleshooting
 
@@ -370,5 +443,5 @@ Ensure the checkpoint is compatible with CLaCLite architecture. Check for warnin
 
 - `evaluation/plot_pareto_v2.py`: Pareto front analysis for retrieval vs inverse design
 - `evaluation/compute_metrics.py`: Comprehensive evaluation metrics
-- `scripts/visualization/run_threshold_embedding_analysis.sh`: Batch threshold analysis
+- `scripts/evaluation/run_threshold_embedding_analysis.sh`: Batch threshold analysis
 - `docs/guides/threshold_embedding_analysis_guide.md`: Threshold analysis guide

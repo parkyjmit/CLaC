@@ -49,6 +49,13 @@ def split_dataset(input_path: str,
     val_df = df.iloc[train_end:val_end]
     test_df = df.iloc[val_end:]
 
+    # Add dummy 'y' field
+    if 'y' not in train_df.columns:
+        print(f"\nAdding 'y' field (answer index = 0) for zero-shot QA evaluation...")
+        train_df['y'] = 0.0
+        val_df['y'] = 0.0
+        test_df['y'] = 0.0
+
     print(f"\nSplit sizes:")
     print(f"  Train: {len(train_df)} ({len(train_df)/total_samples*100:.1f}%)")
     print(f"  Val:   {len(val_df)} ({len(val_df)/total_samples*100:.1f}%)")
